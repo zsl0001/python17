@@ -68,7 +68,7 @@ class my_sql():
         global DeviceList
         self.cursor = self.db.cursor()
         try:
-            sql = "select Device_IMEICode from TMS_Devices where Device_Invalid = '0' and Device_CompanyID ={} order by Device_IMEICode offset {} row fetch next {} row only ".format(Device_CompanyID,data['offset'],data['limit'])
+            sql = "select Device_IMEICode from TMS_Devices where Device_IMEICode like '351608086%' and Device_Invalid = '0' and Device_CompanyID ={} order by Device_IMEICode offset {} row fetch next {} row only ".format(Device_CompanyID,data['offset'],data['limit'])
             self.cursor.execute(sql)
             DeviceList =self.cursor.fetchall()
         except:
@@ -185,7 +185,7 @@ class my_sql():
         return res
 
     def select_IMEI(self,Device_CompanyID):
-        sql = "select Device_IMEICode from TMS_Devices where Device_CompanyID='{}' order by Device_IMEICode".format(Device_CompanyID)
+        sql = "select Device_IMEICode from TMS_Devices where Device_IMEICode like '351608086%' and Device_CompanyID='{}' order by Device_IMEICode".format(Device_CompanyID)
         self.cursor = self.db.cursor()
         self.cursor.execute(sql)
         res = self.cursor.fetchall()
@@ -207,7 +207,7 @@ class my_sql():
             "IMEI": ""
         }
         if Device_CompanyID == None:
-            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0 order by c.Company_ID"
+            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and d.Device_IMEICode like '351608086%'order by c.Company_ID"
             self.cursor = self.db.cursor(as_dict=True)
             self.cursor.execute(sql)
             b = self.cursor.fetchall()
@@ -240,7 +240,7 @@ class my_sql():
             return l
         else:
             Device_CompanyID = tuple(Device_CompanyID)
-            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and d.Device_CompanyID not in {} order by c.Company_ID".format(Device_CompanyID)
+            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0 and d.Device_IMEICode like '351608086%' and d.Device_CompanyID not in {} order by c.Company_ID".format(Device_CompanyID)
             self.cursor = self.db.cursor(as_dict=True)
             self.cursor.execute(sql)
             b = self.cursor.fetchall()
@@ -290,7 +290,7 @@ class my_sql():
             "Id": "",
             "IMEI": ""
         }
-        sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and  c.Company_Name = '{}' order by d.Device_IMEICode".format(str(Company_Name))
+        sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0 and d.Device_IMEICode like '351608086%' and  c.Company_Name = '{}' order by d.Device_IMEICode".format(str(Company_Name))
         self.cursor = self.db.cursor()
         self.cursor.execute(sql)
         res = self.cursor.fetchall()
@@ -327,7 +327,7 @@ class my_sql():
             "Id": "",
             "IMEI": ""
         }
-        sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and  c.Company_Name like '%{}%' order by d.Device_IMEICode".format(str(Company_Name))
+        sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and d.Device_IMEICode like '351608086%' and  c.Company_Name like '%{}%' order by d.Device_IMEICode".format(str(Company_Name))
         self.cursor = self.db.cursor(as_dict=True)
         self.cursor.execute(sql)
         res = self.cursor.fetchall()
@@ -372,7 +372,7 @@ class my_sql():
             "Id": "",
             "IMEI": ""
         }
-        sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and  d.Device_IMEICode like'{}%' order by d.Device_IMEICode".format(
+        sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_IMEICode like '351608086%' and  d.Device_Invalid = 0  and  d.Device_IMEICode like'{}%' order by d.Device_IMEICode".format(
             str(imei))
         self.cursor = self.db.cursor(as_dict=True)
         self.cursor.execute(sql)
@@ -528,7 +528,7 @@ class my_sql():
             "IMEI": ""
         }
         if Device_CompanyID ==None:
-            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0 order by c.Company_ID"
+            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and d.Device_IMEICode like '351608086%' order by c.Company_ID"
             self.cursor = self.db.cursor(as_dict=True)
             self.cursor.execute(sql)
             b = self.cursor.fetchall()
@@ -564,7 +564,7 @@ class my_sql():
             return l
         else:
             Device_CompanyID = tuple(Device_CompanyID)
-            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0  and d.Device_CompanyID not in {} order by c.Company_ID".format(Device_CompanyID)
+            sql = "select  c.Company_Name, d.Device_IMEICode, d.Device_CompanyID  from TMS_Devices  d inner join TMS_Company  c  on d.Device_CompanyID=c.Company_ID and d.Device_Invalid = 0 and d.Device_IMEICode like '351608086%'  and d.Device_CompanyID not in {} order by c.Company_ID".format(Device_CompanyID)
             self.cursor = self.db.cursor(as_dict=True)
             self.cursor.execute(sql)
             b = self.cursor.fetchall()
@@ -598,7 +598,9 @@ class my_sql():
 
     def get_sales_name(self):
         sales_name ={
-            'sales_name' :''
+            'sales_name':'',
+            'sales_company':''
+
         }
         sql = " select Sales_name from TMS_Sales  order by Sales_name "
         self.cursor = self.db.cursor(as_dict=True)
@@ -610,10 +612,12 @@ class my_sql():
             k.append(i["Sales_name"])
             k = sorted(list(set(k)))
         for j in k:
-            # print(j)
             sales_name['sales_name'] = j
+            sql2 = " select Sales_Company from TMS_Sales where Sales_name = '{}'".format(j)
+            self.cursor.execute(sql2)
+            res2 = self.cursor.fetchall()
+            sales_name['sales_company'] =res2[0]['Sales_Company']
             m.append(sales_name.copy())
-
         return m
 
     def find_Company_name_by_sales_name(self,sales_name):
@@ -665,19 +669,17 @@ class my_sql():
             # print(Company_name)
             return m
 
-
     def find_Device_list_by_Company_Id(self, Company_Id):
         Device_list = {
             'IMEI': ''
         }
-        sql = " select Device_IMEICode from TMS_Devices where Device_Invalid = 0 and Device_CompanyID = '{}'".format(Company_Id)
+        sql = " select Device_IMEICode from TMS_Devices where Device_IMEICode like '351608086%' and Device_Invalid = 0 and Device_CompanyID = '{}'".format(Company_Id)
         self.cursor = self.db.cursor(as_dict=True)
         self.cursor.execute(sql)
         res1 = self.cursor.fetchall()
         l = []
         for i in res1:
             Device_list['IMEI'] = i['Device_IMEICode']
-
             l.append(Device_list.copy())
         return l
 
@@ -713,7 +715,32 @@ class my_sql():
             l.append(p_data.copy())
         return  l
 
-
+    def find_Company_name_and_Device_list(self,sales_company):
+        m = []
+        data1 = self.get_sales_name()
+        for i in data1:
+            data = {
+                'sales_Name': '',
+                'content': ''
+            }
+            data2 = {
+                'Company_name': '',
+                'Company_Id': '',
+                'Count': '',
+                'IMEI': ''
+            }
+            data['sales_Name'] = i['sales_name']
+            if i['sales_company'] == sales_company:
+                da2 = self.find_Company_name_by_sales_name(i['sales_name'])
+                for k in da2:
+                    data2['Company_name'] = k['Company_name']
+                    data2['Company_Id'] = k['Company_Id']
+                    data2['Count'] = k['Count']
+                    da3 = self.find_Device_list_by_Company_Id(k['Company_Id'])
+                    data2['IMEI'] = da3
+                    data['content'] = data2
+                    m.append(data.copy())
+        return m
 
 
 def open_mysql():
@@ -722,8 +749,8 @@ def open_mysql():
 
 
 # a = open_mysql()
-# c = a.find_Device_list_by_Company_Id('189')
-# c = a.fint_pactcode_by_imei('351608085005465')
+# # c = a.find_Device_list_by_Company_Id('189')
+# c = a.find_Company_name_and_Device_list('北京')
 # print(c)
 # print(len(c))
 # b=a.find_count_and_List2()

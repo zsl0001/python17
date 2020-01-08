@@ -2,16 +2,27 @@ from flask import Flask
 from flask import jsonify
 from api_preceipt.my_db.my_sql import open_mysql
 from api_preceipt.my_db.my_mgdb import my_mog
-from flask_cors import  *
+from flask_cors import *
 from flask import request
 from bson import json_util
 from werkzeug.datastructures import CombinedMultiDict, MultiDict
 import json
 #
-my_mog = my_mog()
+# my_mog = my_mog()
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
+@app.route('/Get_List/',methods=['POST'])
+def Get_List():
+    my = open_mysql()
+    if request.method == 'POST':
+        data = request.get_json(force=True)
+        print(data)
+        sales_company = data[0]['sales_company']
+    a = my.find_Company_name_and_Device_list(sales_company)
+    a = jsonify(a)
+    my.closeDb()
+    return a
 
 @app.route('/Get_Sales_Name/',methods=['GET'])
 def Get_Sales_Name():
@@ -35,7 +46,7 @@ def Get_Company_Name():
 
 @app.route('/Get_Company_Device/',methods=['POST'])
 def Get_Company_Device():
-    my=open_mysql()
+    my = open_mysql()
     if request.method == 'POST':
         data = request.get_json(force=True)
         Company_Id = data[0]['Company_Id']
@@ -240,6 +251,33 @@ def Get_Pactcode():
         c = jsonify(a)
         my_sql.closeDb()
         return c
+
+
+@app.route('/get_more_sleepNotice/',methods=['POST'])
+def Get__More_SleepNotice():
+    if request.method == 'POST':
+        data = request.get_json(force=True)
+        imei = data[0]["imei"]
+        start_time  = data[1]["start_time"]
+        end_Time = data[2]["end_Time"]
+        page = data[3]["page"]
+        size= data[4]["size"]
+        a = my_mog.find_more_sleepNotice(imei ,start_time,end_Time,size,page)
+        c = jsonify(a)
+        return c
+
+
+@app.route('/get_last_sleepNotice/',methods=['POST'])
+def Get_Last_SleepNotice():
+    if request.method == 'POST':
+        data = request.get_json(force=True)
+        print(data)
+        imei = data[0]['imei']
+        a = my_mog.find_last_sleepNotice(imei)
+        c = jsonify(a)
+        return c
+
+
 
 
 

@@ -83,13 +83,13 @@ import json
 #/http://192.168.1.52:7777/Get_more_postion/?imei=1351608086050445&start_time=2019-04-21 01:11:11&start_time=2019-11-21 23:59:59/
 #Company_Name = '上海中保物流有限公司',Index_PactCode = "RLN190122046"
 
-post_data =[
-    {"Company_Name":"上海中保物流有限公司"},
-    {"Index_PactCode":"RLN190122046"}
-]
- # 通过公司名字和合同号 获取短信详情
-a = requests.post(url ="http://192.168.1.52:7777/get_msg/",data=json.dumps(post_data))
-print(a.text)
+# post_data =[
+#     {"Company_Name":"上海中保物流有限公司"},
+#     {"Index_PactCode":"RLN190122046"}
+# ]
+#  # 通过公司名字和合同号 获取短信详情
+# a = requests.post(url ="http://192.168.1.52:7777/get_msg/",data=json.dumps(post_data))
+# print(a.text)
 
 
 
@@ -98,6 +98,32 @@ print(a.text)
 #     {"page":1},
 #     {"size":20}
 # ]
-# 通过设备码获取合同号
+# # 通过设备码获取合同号
 # a = requests.post(url ="http://192.168.1.52:7777/get_pactcode/",data=json.dumps(post_data))
 # print(a.text)
+
+
+# post_data =[
+#     {"imei":351608086029910},
+#     {'start_time':'2019-11-15 05:05:28'},
+#     {"end_Time":'2019-11-21 03:31:23'},
+#     {"page":1},
+#     {"size":20}
+# ]
+# # 通过设备码获取合同号
+# a = requests.post(url ="http://192.168.1.52:7777/get_more_sleepNotice/",data=json.dumps(post_data))
+# print(a.text)
+# post_data =[
+#     {"imei":351608086029910},
+# ]
+# # 通过设备码获取合同号
+# a = requests.post(url ="http://192.168.1.52:7777/get_last_sleepNotice/",data=json.dumps(post_data))
+# print(a.text)
+
+
+post_data =[
+    {"sales_company":'长沙'},
+]
+# 通过设备码获取合同号
+a = requests.post(url ="http://192.168.1.52:7777/Get_List/",data=json.dumps(post_data),)
+print(a.text.encode('utf-8').decode('unicode_escape'))
