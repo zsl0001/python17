@@ -1,3 +1,6 @@
+import sys
+
+sys.path.append("..")
 import copy
 import datetime
 import json
@@ -5,13 +8,15 @@ import json
 import pymongo
 import requests
 from bson import json_util
+from myconfig import sqldb, mgdb, api_cfg
+from my_db.my_sql import my_sql
 
-from api_preceipt.my_db.my_sql import my_sql
-
-my_sql = my_sql(host="192.168.1.151", username="WLY", password="Wly2.@907", database='WLY')
+my_sql = my_sql(**sqldb)
+# print(mgdb)
 
 
 class my_mog():
+
     def trans_add(self, lat, lng):
         base_url = 'http://api.map.baidu.com/reverse_geocoding/v3/?ak=SMm8htpBXtu3Hd4n5XUsQwiUnMGvWdBU&output=json&coordtype=wgs84ll&location='
         location = str(lat) + ',' + str(lng)
@@ -22,7 +27,7 @@ class my_mog():
         return addr
 
     def __init__(self):
-        self.client = pymongo.MongoClient('192.168.1.168', 27017, username='wangcan', password='123456')
+        self.client = pymongo.MongoClient(host=mgdb['host'])
         self.db = self.client.er
 
     # client = pymongo.MongoClient('mongodb://er_user:vE0UmSo1fV3q@dds-uf6a4f0597f9e3041.mongodb.rds.aliyuncs.com:3717,dds-uf6a4f0597f9e3042.mongodb.rds.aliyuncs.com:3717/er?replicaSet=mgset-13011481')
@@ -61,7 +66,7 @@ class my_mog():
             l[0]['time'] = a
             return l[0]
         else:
-            return '暂无数据'
+            return 0
 
     def find_more_postion(self, imei=None, start_time=None, end_Time=None):  # 查询单个设备某个时间点的定位数据
         l = []
@@ -298,8 +303,9 @@ class my_mog():
             data['time'] = str(i['date']).split('.')[0]
             l.append(data.copy())
         return l
+
     # db_name = 'test'
-    def find_one_elc(self,imei=None):
+    def find_one_elc(self, imei=None):
         l = []
         collection = self.db.status
         sql = {'devId': imei}
@@ -309,7 +315,7 @@ class my_mog():
 
         return l
 
-    def find_more_elc(self, imei=None,start_time=None, end_Time=None):
+    def find_more_elc(self, imei=None, start_time=None, end_Time=None):
         l = []
         startTime = datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
         endTime = datetime.datetime.strptime(end_Time, '%Y-%m-%d %H:%M:%S')
@@ -361,3 +367,5 @@ my_mog = my_mog()
 # a = my_mog.db_electric('351608085028046')
 # print(a)
 # db.getCollection('smsQueue').find({'content':{$regex:/上海林内有限公司\|RLN180104023/}})
+post_data = {"Company_Name": "荣邦国际物流(上海)有限公司", "Index_PactCode": "8841712020030301"}
+my_mog.find_msg_by_imei(**post_data)
