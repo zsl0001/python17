@@ -20,7 +20,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer, BadSignature, SignatureExpired
 from flask import jsonify, current_app, g, request
 from functools import wraps
-from login_mode.response_code import RET
+
 from myconfig import sqldb, mgdb, api_cfg, ere_cfg
 
 my = open_mysql()
@@ -299,6 +299,8 @@ class DeviceStock(db.Model):
     is_disable = db.Column(db.Integer, default=0)
     Remarks = db.Column(db.String(128))
     Remark_Time = db.Column(db.DateTime)
+    Device_type = db.Column(db.String(128))
+    Device_Temperature = db.Column(db.String(128))
 
 
 class SalesSetLog(db.Model):
@@ -581,6 +583,14 @@ class TMSSale(db.Model):
     Parent_level = db.Column(db.String(255, 'Chinese_PRC_CI_AS'))
 
 
+class TemperatureReceipt(db.Model):
+    __tablename__ = 'Temperature_Receipt'
+    __bind_key__ = 'ere'
+    __table_args__ = {'schema': 'ERE.dbo'}
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    imei = db.Column(db.String(255, 'Chinese_PRC_CI_AS'))
+
+
 class TMSDevice(db.Model):
     __tablename__ = 'TMS_Devices'
     __table_args__ = {'schema': 'WLY.dbo'}
@@ -601,6 +611,7 @@ class TMSDevice(db.Model):
     Device_SalerName = db.Column('Device_SalerName', db.String(128))
     Device_Comments = db.Column('Device_Comments', db.String(128))
     Device_Creator = db.Column('Device_Creator', db.Integer)
+    Device_PositionTime = db.Column('Device_PositionTime', db.DateTime)
 
 
 class TMSOrderIndexSms(db.Model):
@@ -1483,9 +1494,10 @@ def search_pactcode_by_imei(s_data, page, size, id=None):
                  TMSOrderIndex.Index_PactCode.like(s_data['PactCode']),
                  TMSSale.Company_Name.like(s_data['Company_Name']),
                  TMSDevice.Device_IMEICode.like(s_data['IMEI']))).order_by(
-            TMSOrderIndex.Index_FromTime.desc()).paginate(
+            TMSOrderIndex.Index_FromTime.desc()).with_for_update(read=True).paginate(
             int(page), int(size), False)
         res = post_data.items
+        da["count"] = post_data.total
         for i in res:
             p_data['Index_PactCode'] = i[0]
             p_data['Index_FromTime'] = str(i[1].strftime("%Y-%m-%d %H:%M:%S"))
@@ -1497,20 +1509,19 @@ def search_pactcode_by_imei(s_data, page, size, id=None):
             p_data['Order_Status'] = i[7]
             l.append(p_data.copy())
 
-        count = db.session.query(TMSOrderIndex, TMSSale, TMSDevice).join(TMSDevice,
-                                                                         TMSSale.Company_Id == TMSDevice.Device_CompanyID).join(
-            TMSOrderIndex, TMSDevice.Device_IMEICode == TMSOrderIndex.Index_DeviceCode).filter(
-            and_(TMSDevice.Device_Type.between(2, 3),
-                 # TMSDevice.Device_IMEICode == TMSOrderIndex.Index_DeviceCode,
-                 TMSOrderIndex.Index_ID == TMSOrderIndex.Index_RootOrderID,
-                 TMSOrderIndex.Index_Status.between(2, 16),
-                 TMSSale.Is_disabled == 0,
-                 # TMSOrderIndex.Index_CreatorCompanyID == TMSSale.Company_Id,
-                 TMSOrderIndex.Index_PactCode.like(s_data['PactCode']),
-                 TMSSale.Company_Name.like(s_data['Company_Name']),
-                 TMSDevice.Device_IMEICode.like(s_data['IMEI']))).count()
+        # count = db.session.query(TMSOrderIndex, TMSSale, TMSDevice).join(TMSDevice,
+        #                                                                  TMSSale.Company_Id == TMSDevice.Device_CompanyID).join(
+        #     TMSOrderIndex, TMSDevice.Device_IMEICode == TMSOrderIndex.Index_DeviceCode).filter(
+        #     and_(TMSDevice.Device_Type.between(2, 3),
+        #          # TMSDevice.Device_IMEICode == TMSOrderIndex.Index_DeviceCode,
+        #          TMSOrderIndex.Index_ID == TMSOrderIndex.Index_RootOrderID,
+        #          TMSOrderIndex.Index_Status.between(2, 16),
+        #          TMSSale.Is_disabled == 0,
+        #          # TMSOrderIndex.Index_CreatorCompanyID == TMSSale.Company_Id,
+        #          TMSOrderIndex.Index_PactCode.like(s_data['PactCode']),
+        #          TMSSale.Company_Name.like(s_data['Company_Name']),
+        #          TMSDevice.Device_IMEICode.like(s_data['IMEI']))).with_for_update(read=True).count()
 
-        da["count"] = count
         da["datalist"] = l
         db.session.close()
     else:
@@ -1536,7 +1547,7 @@ def search_pactcode_by_imei(s_data, page, size, id=None):
                  TMSSale.user_id.in_(my_id),
                  TMSSale.Is_disabled == 0,
                  TMSDevice.Device_IMEICode.like(s_data['IMEI']))).order_by(
-            TMSOrderIndex.Index_FromTime.desc()).paginate(
+            TMSOrderIndex.Index_FromTime.desc()).with_for_update(read=True).paginate(
             int(page), int(size), False)
         res = post_data.items
         for i in res:
@@ -1562,7 +1573,7 @@ def search_pactcode_by_imei(s_data, page, size, id=None):
                  TMSSale.Is_disabled == 0,
                  TMSOrderIndex.Index_PactCode.like(s_data['PactCode']),
                  TMSSale.Company_Name.like(s_data['Company_Name']),
-                 TMSDevice.Device_IMEICode.like(s_data['IMEI']))).count()
+                 TMSDevice.Device_IMEICode.like(s_data['IMEI']))).with_for_update(read=True).count()
 
         da["count"] = count
         da["datalist"] = l
@@ -1659,7 +1670,7 @@ def assignment_company2(data, ip, b=None):
     area_id = area_res.area_id
     user = User()
     sales = TMSSale()
-    a = user.query.filter(User.username == salesaccount).first()  # 获取用户id
+    a = user.query.filter(User.username == salesaccount, User.is_disable == 0).first()  # 获取用户id
     if None == a:
         return {'res': "该用户不存在!", "code": -201}
     b = db.session.query(TMSCompany.Company_ID, TMSCompany.Company_Name).filter(
@@ -2076,7 +2087,7 @@ def get_no_company_sales():
     dat = db.session.query(User).filter(User.username != 'admin', User.is_disable == 0).order_by(User.join_time).all()
     l = []
     for i in dat:
-        d = db.session.query(TMSSale).filter(TMSSale.user_id ==i.id,TMSSale.Is_disabled == 0).first()
+        d = db.session.query(TMSSale).filter(TMSSale.user_id == i.id, TMSSale.Is_disabled == 0).first()
         if d is None:
             data["user_id"] = i.id
             data["username"] = i.username
@@ -2088,6 +2099,7 @@ def get_no_company_sales():
     r["count"] = len(l)
     r["datalist"] = l
     return r
+
 
 # print(get_no_company_sales())
 def get_sales_list2(s_data):
@@ -2197,7 +2209,7 @@ def search_company_list2(args, Company_Name, page, size):
 
 
 def change_sales_company(Company_Id, user_name=None, disable=0):
-    res1 = db.session.query(TMSSale).filter(TMSSale.Company_Id == Company_Id).first()
+    res1 = db.session.query(TMSSale).filter(TMSSale.Company_Id == Company_Id, TMSSale.Is_disabled == 0).first()
     user_id = res1.user_id
     username = db.session.query(User).filter(User.id == user_id).first().username
     res1.Is_disabled = disable

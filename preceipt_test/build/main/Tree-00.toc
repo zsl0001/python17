@@ -1,0 +1,5 @@
+('c:\\users\\administrator\\appdata\\local\\programs\\python\\python37\\lib\\site-packages\\stomp.py-4.1.23-py3.7.egg',
+ None,
+ {'*.py', '*.pyw', '*.pyc', '*.cp37-win_amd64.pyd', '*.pyd', 'EGG-INFO'},
+ 'DATA',
+ [])

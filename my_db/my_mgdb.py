@@ -332,16 +332,16 @@ class my_mog():
 # db和collection都是延时创建的，在添加Document时才真正创建
 
 
-'''
-
-select * from TMS_OrderIndex_Sms where Index_PactCode = '2200142892'
-select * from TMS_OrderIndex where Index_PactCode = '2200142892' and Index_RootOrderID = Index_ID
-db.getCollection('status').find({} 
- sql = {'devId':str(i['Index_DeviceCode']),'time':{'$gte':i['Index_FromTime'],'$lte':i['Index_ToTime']}}
- db.getCollection('smsQueue').find({'content':{$regex:/上海中保物流有限公司\|RLN190122046/}}) 出发
- db.getCollection('smsQueue').find({'content':{$regex:/RLN190122046\|上海中保物流有限公司/}}) 到达
- 
-'''
+# '''
+#
+# select * from TMS_OrderIndex_Sms where Index_PactCode = '2200142892'
+# select * from TMS_OrderIndex where Index_PactCode = '2200142892' and Index_RootOrderID = Index_ID
+# db.getCollection('status').find({}
+#  sql = {'devId':str(i['Index_DeviceCode']),'time':{'$gte':i['Index_FromTime'],'$lte':i['Index_ToTime']}}
+#  db.getCollection('smsQueue').find({'content':{$regex:/上海中保物流有限公司\|RLN190122046/}}) 出发
+#  db.getCollection('smsQueue').find({'content':{$regex:/RLN190122046\|上海中保物流有限公司/}}) 到达
+#
+# '''
 # #
 my_mog = my_mog()
 # data = [
@@ -367,5 +367,5 @@ my_mog = my_mog()
 # a = my_mog.db_electric('351608085028046')
 # print(a)
 # db.getCollection('smsQueue').find({'content':{$regex:/上海林内有限公司\|RLN180104023/}})
-post_data = {"Company_Name": "荣邦国际物流(上海)有限公司", "Index_PactCode": "8841712020030301"}
-my_mog.find_msg_by_imei(**post_data)
+# post_data = {"Company_Name": "荣邦国际物流(上海)有限公司", "Index_PactCode": "8841712020030301"}
+# my_mog.find_msg_by_imei(**post_data)

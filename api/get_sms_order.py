@@ -1,3 +1,4 @@
+import json
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from threading import currentThread
 
@@ -5,11 +6,12 @@ import sys
 from math import radians, cos, sin, asin, sqrt
 from concurrent.futures import ThreadPoolExecutor
 
+import requests
+
 sys.path.append("..")
 from datetime import datetime, timedelta
 from time import sleep
-
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, cast
 from geopy.distance import geodesic
 from models import *
 from models import SmsSendtrack
@@ -30,6 +32,7 @@ def local2utc(local_st):
     return utc_st
 
 
+# 轩豪 2309
 def get_sms_order():  # 同步SMS表所有的订单
     sms_track_Index_Id = db.session.query(SmsSendtrack.Index_Id).filter(
         SmsSendtrack.Index_Status_SMS.between(0, 16)).order_by(
@@ -63,6 +66,7 @@ def get_sms_order():  # 同步SMS表所有的订单
                                                TMSOrderIndexSms.Index_Status != 32).all()
     if sms_order_list:
         for sms_order in sms_order_list:
+            print('正在同步合同号为{}的订单，订单编号为{}'.format(sms_order[0], sms_order[2]))
             Sendtrack = SmsSendtrack()
             Sendtrack.Index_Id = sms_order[0]
             Sendtrack.Index_Code = sms_order[1]
@@ -94,13 +98,19 @@ def get_sms_order():  # 同步SMS表所有的订单
             Sendtrack.Index_Status = 0
             Sendtrack.Index_SignTime = datetime.strptime('1900-01-01 00:00:00', '%Y-%m-%d %H:%M:%S')
             Sendtrack.Index_RealToTime = datetime.strptime('1900-01-01 00:00:00', '%Y-%m-%d %H:%M:%S')
-            if sms_order[12] and sms_order[13] and sms_order[12].find(',') > 0 and sms_order[13].find(',') > 0:
-                dis = geodesic((sms_order[12].split(',')[1], sms_order[12].split(',')[0]),
-                               (sms_order[13].split(',')[1], sms_order[13].split(',')[0])).km
-                if dis <= 300:
-                    Sendtrack.Index_ShipMode = 1
-                else:
-                    Sendtrack.Index_ShipMode = 2
+            if int(sms_order[16]) == 1 and int(sms_order[15]) == 1:
+                if sms_order[12] and sms_order[13] and sms_order[12].find(',') > 0 and sms_order[13].find(',') > 0:
+                    dis = geodesic((sms_order[12].split(',')[1], sms_order[12].split(',')[0]),
+                                   (sms_order[13].split(',')[1], sms_order[13].split(',')[0])).km
+                    # sms_order[16] = Index_Totype  sms_order[15] = Index_Fromtype
+                    if dis <= 300:
+                        Sendtrack.Index_ShipMode = 1
+                    else:
+                        Sendtrack.Index_ShipMode = 2
+            elif sms_order[7] == sms_order[4]:
+                Sendtrack.Index_ShipMode = 1
+            else:
+                Sendtrack.Index_ShipMode = 2
             try:
                 db.session.add(Sendtrack)
                 db.session.commit()
@@ -180,6 +190,7 @@ def set_sign_status():  # 设置订单签收状态
     sign_list = get_sign_id()
     for i in sign_list:
         res = db.session.query(SmsSendtrack).filter(SmsSendtrack.Index_RootOrderID == i['Index_RootOrderID']).first()
+        # print("正在同步签收订单{},{},{}".format(i['Index_RootOrderID'], i['Index_Status'], i['Index_SignTime']))
         res.Index_Status = i['Index_Status']
         res.Index_SignTime = i['Index_SignTime']
         try:
@@ -188,15 +199,15 @@ def set_sign_status():  # 设置订单签收状态
             print(e)
 
 
-def get_msg_status():  # 获取未签收短信发送情况
+def get_msg_status():  # 获取未签收短信发送情况以及到达状态
     res = db.session.query(SmsSendtrack.Index_RootOrderID).filter(SmsSendtrack.Index_Status_SMS == 2,
                                                                   SmsSendtrack.Index_Status == 2).all()
     for i in res:
         index_order = db.session.query(TMSOrderIndex.Index_StartMsgTime,
                                        TMSOrderIndex.Index_ArriveMsgTime,
                                        TMSOrderIndex.Index_RealToTime,
-                                       TMSOrderIndex.Index_CreateTime).filter(
-            TMSOrderIndex.Index_RootOrderID == i[0], TMSOrderIndex.Index_SrcOrderID == 0).first()
+                                       TMSOrderIndex.Index_CreateTime).filter(TMSOrderIndex.Index_RootOrderID == i[0],
+                                                                              TMSOrderIndex.Index_SrcOrderID == 0).first()
         if index_order:
             Sendtrack = db.session.query(SmsSendtrack).filter(SmsSendtrack.Index_RootOrderID == i[0]).first()
             Sendtrack.Index_CreateTime = index_order[3]
@@ -204,23 +215,33 @@ def get_msg_status():  # 获取未签收短信发送情况
                 if str(index_order[0]) >= str(Sendtrack.Index_StartMsgTime).split('.')[0] and index_order[0]:
                     Sendtrack.Index_StartMsgTime = index_order[0]
                     Sendtrack.Index_StartMsgStatus = 1
+                    Sendtrack.Index_NoStartMsgRes = "{'res': '出发短信已发送！', 'code': 10001}"
+                    Sendtrack.Index_NoStartMsgCode = 10001
             if str(index_order[1]) >= str(d):
                 if str(index_order[1]) >= str(Sendtrack.Index_ArriveMsgTime).split('.')[0] and index_order[1]:
-                    Sendtrack.Index_ArriveMsgStatus = index_order[1]
+                    Sendtrack.Index_ArriveMsgTime = index_order[1]
                     Sendtrack.Index_ArriveMsgStatus = 1
+                    Sendtrack.Index_NoArriveMsgRes = "{'res':'预到达短信已发送！','code':10001}"
+                    Sendtrack.Index_NoArriveMsgCode = 10001
             if str(index_order[2]) >= str(d):
                 if str(index_order[2]) >= str(Sendtrack.Index_RealToTime).split('.')[0] and index_order[2]:
                     Sendtrack.Index_RealToTime = index_order[2]
                     Sendtrack.Index_EndStatus = 1
+                    Sendtrack.Index_NoArriveRes = "{'res':'已触发到达状态！','code':10001}"
+                    Sendtrack.Index_NoArriveResCode = 10001
             try:
                 db.session.commit()
             except Exception as e:
                 print(e)
 
 
-def get_status4_msg():  # 获取签收的订单短信发送情况
+def get_status4_msg():  # 获取签收的订单短信发送情况以及到达状态
+    time_now = datetime.now()
     res = db.session.query(SmsSendtrack.Index_RootOrderID).filter(SmsSendtrack.Index_Status_SMS == 2,
-                                                                  SmsSendtrack.Index_Status.between(4, 16)).all()
+                                                                  SmsSendtrack.Index_Status.between(4, 16),
+                                                                  SmsSendtrack.Index_SignTime >= (
+                                                                              time_now - timedelta(days=5))
+                                                                  ).all()
     for i in res:
         index_order = db.session.query(TMSOrderIndex.Index_StartMsgTime,
                                        TMSOrderIndex.Index_ArriveMsgTime,
@@ -234,21 +255,34 @@ def get_status4_msg():  # 获取签收的订单短信发送情况
                 if str(index_order[0]) >= str(Sendtrack.Index_StartMsgTime).split('.')[0] and index_order[0]:
                     Sendtrack.Index_StartMsgTime = index_order[0]
                     Sendtrack.Index_StartMsgStatus = 1
+                    Sendtrack.Index_NoStartMsgRes = "{'res':'出发短信已发出！！！','code':10001}"
+                    Sendtrack.Index_NoStartMsgCode = 10001
             if str(index_order[1]) >= str(d):
                 if str(index_order[1]) >= str(Sendtrack.Index_ArriveMsgTime).split('.')[0] and index_order[1]:
-                    Sendtrack.Index_ArriveMsgStatus = index_order[1]
+                    Sendtrack.Index_ArriveMsgTime = index_order[1]
                     Sendtrack.Index_ArriveMsgStatus = 1
+                    Sendtrack.Index_NoArriveMsgRes = "{'res':'预到达短信已发出！！！！','code':10001}"
+                    Sendtrack.Index_NoArriveMsgCode = 10001
+            if Sendtrack.Index_CreatorCompanyID == '2309':  # 轩豪不发预到达短信
+                Sendtrack.Index_ArriveMsgStatus = 1
+                Sendtrack.Index_NoArriveMsgRes = "{'res':'轩豪不发预到达短信！！！！','code':10001}"
+                Sendtrack.Index_NoArriveMsgCode = 10001
             if str(index_order[2]) >= str(d):
                 if str(index_order[2]) >= str(Sendtrack.Index_RealToTime).split('.')[0] and index_order[2]:
                     Sendtrack.Index_RealToTime = index_order[2]
                     Sendtrack.Index_EndStatus = 1
+                    Sendtrack.Index_NoArriveRes = "{'res':'已触发到达！！！！','code':10001}"
+                    Sendtrack.Index_NoArriveResCode = 10001
+                    Sendtrack.Index_UpdateTime = datetime.now()
+                    # print(datetime.now(), index_order[2], i[0])
             try:
                 db.session.commit()
             except Exception as e:
                 print(e)
 
 
-def set_time(imei, start_time, end_time, order_statues, sign_time=None):  # 将时间按3小时一次切割查询
+def set_time(imei, start_time, end_time, order_statues, sign_time=None, from_time=None,
+             bing_time=None):  # 将时间按3小时一次切割查询
     l = []
     dat = {'start_time': start_time,
            'end_time': end_time,
@@ -306,6 +340,25 @@ def get_position(data):
     return my_list
 
 
+def get_bing_position(data):
+    p_data = {}
+    st = local2utc(str(data['bing_time']))
+    res = Position.objects.filter(
+        (Q(time__gte=st) & Q(devId=str(data['imei'])))).order_by('time').limit(1)
+    for i in res:
+        p_data = {
+            'devId': i.devId,
+            "longitude": i.longitude,
+            "latitude": i.latitude,
+            "bLongitude": i.bLongitude,
+            "bLatitude": i.bLatitude,
+            "type": i.type,
+            "time": get_location_time(i.time),
+            "speed": i.speed
+        }
+    return p_data
+
+
 def get_no_start_msg_reason(index_id,
                             case1):  # 获取没发出发短信的原因 case1表示未发哪种短信
     c1 = 'SmsSendtrack.{}'.format(case1)
@@ -313,8 +366,11 @@ def get_no_start_msg_reason(index_id,
                            SmsSendtrack.Index_FromLocation, SmsSendtrack.Index_ToLocation,
                            SmsSendtrack.Index_Status_SMS, SmsSendtrack.Index_SignTime,
                            SmsSendtrack.Index_DeviceCode, SmsSendtrack.Index_DeviceBindingTime,
-                           SmsSendtrack.Index_Status, SmsSendtrack.Index_CreateTime).filter(
-        SmsSendtrack.Index_Id == index_id).first()
+                           SmsSendtrack.Index_Status, SmsSendtrack.Index_CreateTime, SmsSendtrack.Index_Totype,
+                           SmsSendtrack.Index_Fromtype).filter(
+        SmsSendtrack.Index_Id == index_id,
+        or_(SmsSendtrack.Index_StartMsgStatus == 0, SmsSendtrack.Index_ArriveMsgStatus == 0,
+            SmsSendtrack.Index_EndStatus == 0)).first()
     if res:
         try:
             Index_FromTime = res[1]
@@ -350,6 +406,8 @@ def get_no_start_msg_reason(index_id,
             return "{'res': 'SMS设备绑定时间缺失!', 'code': -10001}", -10001
         Index_Status = res[9]
         Index_CreateTime = res[10]
+        Index_Totype = res[11]
+        Index_Fromtype = res[12]
         up_res = db.session.query(SmsSendtrack).filter(eval(c1) == 0, SmsSendtrack.Index_Id == index_id).first()
         if Index_Status_SMS != '2':
             if case1 == 'Index_StartMsgStatus':
@@ -367,16 +425,23 @@ def get_no_start_msg_reason(index_id,
                         days=3))  # .strftime("%Y-%m-%d %H:%M:%S")
                     # now_time = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S')
                     if Index_DeviceBindingTime:
-                        dat = {'start_time': str(Index_DeviceBindingTime).split('.')[0],
-                               'end_time': str(end_time),
-                               'imei': imei[0],
-                               'order_statues': 2
-                               }
+                        dat = {'start_time': (
+                            str(Index_DeviceBindingTime).split('.')[0] if str(Index_DeviceBindingTime).split('.')[0] <
+                                                                          str(Index_FromTime).split('.')[0] else
+                            str(Index_FromTime).split('.')[0]),
+                            'end_time': str(end_time),
+                            'imei': imei[0],
+                            'order_statues': 2,
+                            'from_time': Index_FromTime,
+                            'bing_time': str(Index_DeviceBindingTime).split('.')[0]
+                        }
                     else:
                         dat = {'start_time': str(Index_FromTime).split('.')[0],
                                'end_time': str(end_time),
                                'imei': imei[0],
-                               'order_statues': 2
+                               'order_statues': 2,
+                               'from_time': Index_FromTime,
+                               'bing_time': str(Index_DeviceBindingTime).split('.')[0]
                                }
                 else:
                     return "{'res': '绑定的设备不存在!', 'code': 10001}", 10001
@@ -387,61 +452,85 @@ def get_no_start_msg_reason(index_id,
                     # datetime.strptime(str(res[4]).split('.')[0], "%Y-%m-%d %H:%M:%S") + timedelta(days=3)
                     sign_time = datetime.strptime(str(Index_SignTime).split('.')[0], "%Y-%m-%d %H:%M:%S")
                     if Index_DeviceBindingTime:
-                        if sign_time >=end_time:
-                            dat = {'start_time': str(Index_DeviceBindingTime).split('.')[0],
-                                   'end_time': str(end_time),
-                                   'imei': imei[0],
-                                   'order_statues': 4,
-                                   'sign_time': end_time
-                                   }
+                        if sign_time >= end_time:
+                            dat = {'start_time': (
+                                str(Index_DeviceBindingTime).split('.')[0] if str(Index_DeviceBindingTime).split('.')[
+                                                                                  0] < str(Index_FromTime).split('.')[
+                                                                                  0] else
+                                str(Index_FromTime).split('.')[0]),
+                                # 'bindingTime': str(Index_DeviceBindingTime).split('.')[0],
+                                'end_time': str(end_time),
+                                'imei': imei[0],
+                                'order_statues': 4,
+                                'sign_time': end_time,
+                                'from_time': Index_FromTime,
+                                'bing_time': str(Index_DeviceBindingTime).split('.')[0]
+                            }
                         else:
-                            dat = {'start_time': str(Index_DeviceBindingTime).split('.')[0],
-                                   'end_time': str(end_time),
-                                   'imei': imei[0],
-                                   'order_statues': 4,
-                                   'sign_time': sign_time
-                                   }
+                            dat = {'start_time': (
+                                str(Index_DeviceBindingTime).split('.')[0] if str(Index_DeviceBindingTime).split('.')[
+                                                                                  0] < str(Index_FromTime).split('.')[
+                                                                                  0] else
+                                str(Index_FromTime).split('.')[0]),
+                                # str(Index_DeviceBindingTime).split('.')[0],
+                                'end_time': str(end_time),
+                                'imei': imei[0],
+                                'order_statues': 4,
+                                'sign_time': sign_time,
+                                'from_time': Index_FromTime,
+                                'bing_time': str(Index_DeviceBindingTime).split('.')[0]
+                            }
                     else:
                         if sign_time >= end_time:
                             dat = {'start_time': str(Index_FromTime).split('.')[0],
                                    'end_time': str(end_time),
                                    'imei': imei[0],
                                    'order_statues': 4,
-                                   'sign_time': end_time
+                                   'sign_time': end_time,
+                                   'from_time': Index_FromTime,
+                                   'bing_time': str(Index_DeviceBindingTime).split('.')[0]
                                    }
                         else:
-                            dat = {'start_time': str(Index_DeviceBindingTime).split('.')[0],
+                            dat = {'start_time': str(Index_FromTime).split('.')[0],
+                                   # str(Index_DeviceBindingTime).split('.')[0],
                                    'end_time': str(end_time),
                                    'imei': imei[0],
                                    'order_statues': 4,
-                                   'sign_time': sign_time
+                                   'sign_time': sign_time,
+                                   'from_time': Index_FromTime,
+                                   'bing_time': str(Index_DeviceBindingTime).split('.')[0]
                                    }
-                    if str(dat['sign_time'])< str(dat['start_time']):
+                    if str(dat['sign_time']) < str(dat['start_time']):
                         return "{'res': '订单签收时间在发货时间之前!', 'code': -10001}", -10001
                 else:
                     return "{'res': '绑定的设备不存在!', 'code': 10001}", 10001
-            print('dat1', dat)
+            # print('dat1', dat)
             all_time = set_time(**dat)
             get_m_p = []
+            bing_position = get_bing_position(dat)
             for i in all_time:
                 get_m_p = get_m_p + get_position(i)
             if get_m_p:
-                return get_m_p, Index_FromLocation, Index_ToLocation, Index_DeviceBindingTime, Index_CreateTime
+                return get_m_p, Index_FromLocation, Index_ToLocation, Index_DeviceBindingTime, Index_CreateTime, Index_FromTime, bing_position, Index_Fromtype, Index_Totype
             else:
                 return "{'res': '设备未正常工作!', 'code': -10001}", -10001
-
     else:
         # up_res = db.session.query(SmsSendtrack).filter(eval(c1) == 0, SmsSendtrack.Index_Id == index_id).first()
-        return "{'res': '订单数据无异常!', 'code': 10001}", 10001
+        # print({'index_id':index_id})
+        return "{'res': '短信已发出/订单已达到!', 'code': 10001}", 10001
+
+
 # dat = {'start_time': '2020-09-01 10:54:05', 'end_time': '2020-09-10 23:59:01', 'imei': '351608087064973', 'order_statues': 4, 'sign_time': '2020-09-02 16:03:41'}
 
 
 # 1183160
-def get_start_msg_res(index_id, datalist, FromLocation, ToLocation):  # 计算出发短信发送条件
+def get_start_msg_res(index_id, datalist, FromLocation, ToLocation, Index_DeviceBindingTime,
+                      Index_FromTime, bing_position):  # 计算出发短信发送条件
     # a = get_no_start_msg_reason(index_id=index_id, case1='Index_StartMsgStatus')
     datalist = datalist
     FromLocation = FromLocation
     ToLocation = ToLocation
+    # print(bing_position, Index_FromTime, Index_DeviceBindingTime)
     c = 0
     F_l = []
     T_l = []
@@ -455,27 +544,43 @@ def get_start_msg_res(index_id, datalist, FromLocation, ToLocation):  # 计算�
         d1_list.append(round(distance1, 2))
         d2_list.append(round(distance2, 2))
     l = [d1_list, d2_list]
-    if l[0][0] >= all_distance / 3:
-        return {'res': '设备第一个定位点超过总距离三分之一！', "code": 10001}, 10001
+    if bing_position:
+        bing_location = (bing_position['latitude'], bing_position['longitude'])
     else:
-        for k in range(1, len(l[0]) - 1):
-            if l[0][k] < l[0][k + 1]:
-                c = c + 1
-                F_l.append(c)
-            elif l[0][k - 1] < l[0][k + 1]:
-                c = c + 1
-                F_l.append(c)
-            else:
-                c = 0
-        for k in range(1, len(l[1]) - 1):
-            if l[1][k] > l[1][k + 1]:
-                c = c + 1
-                T_l.append(c)
-            elif l[1][k - 1] > l[1][k + 1]:
-                c = c + 1
-                T_l.append(c)
-            else:
-                c = 0
+        bing_location = l[0][0]
+        if bing_location:
+            return {'res': '设备绑定后无数据！', "code": -10001}, -10001
+    bing_dis = geodesic(bing_location, FromLocation).km
+    if Index_DeviceBindingTime >= Index_FromTime:
+        if bing_dis >= all_distance / 3:
+            return {'res': '设备第一个定位点超过总距离三分之一！', "code": 10001}, 10001
+    else:
+        min_dis = min(l[0])  # 获取距离出发地最近的点
+        if min_dis >= all_distance / 3:
+            return {'res': '设备第一个定位点超过总距离三分之一！', "code": 10001}, 10001
+        else:
+            min_index = l[0].index(min_dis)  # 获取最近位置的下标
+            l[0] = l[0][min_index:]  # 从最近的位置开始，重新划分定位点
+            l[1] = l[1][min_index:]
+            l = [l[0], l[1]]
+    for k in range(1, len(l[0]) - 1):
+        if l[0][k] < l[0][k + 1]:
+            c = c + 1
+            F_l.append(c)
+        elif l[0][k - 1] < l[0][k + 1]:
+            c = c + 1
+            F_l.append(c)
+        else:
+            c = 0
+    for k in range(1, len(l[1]) - 1):
+        if l[1][k] > l[1][k + 1]:
+            c = c + 1
+            T_l.append(c)
+        elif l[1][k - 1] > l[1][k + 1]:
+            c = c + 1
+            T_l.append(c)
+        else:
+            c = 0
     move_trends = []  # 出发地运动趋势
     end_trends = []  # 目的地距离趋势
     for i, item in enumerate(F_l):
@@ -510,10 +615,10 @@ def get_arrive_msg_res(datalist, FromLocation, ToLocation, Transporttype):  # �
         else:
             return "{'res': '10公里内没有定位点,不符合市内发送预到达短信条件！''code': 10001}", 10001
     if Transporttype == 2:  # 长途订单
-        if any([v < 60 for v in d2_list]):
-            return "{'res': '定位距离目的地还剩60公里,符合长途发送预到达短信条件！','code': -10001}", -10001
+        if any([v < 30 for v in d2_list]):
+            return "{'res': '定位距离目的地还剩30公里,符合长途发送预到达短信条件！','code': -10001}", -10001
         else:
-            return "{'res': '60公里内没有定位点,不符合长途发送预到达短信条件','code': 10001}", 10001
+            return "{'res': '30公里内没有定位点,不符合长途发送预到达短信条件','code': 10001}", 10001
 
 
 def get_arrive_status(id):  # 判断设备位置和目的地距离 到达状态
@@ -528,12 +633,12 @@ def get_arrive_status(id):  # 判断设备位置和目的地距离 到达状态
     count = 0
     order_list = ['1', ' 2']
     order_list2 = ['4', ' 8', '16']
-    print(index_id, res[-1])
+    # print(index_id, res[-1])
     # distance2 = geodesic((i['latitude'], i['longitude']), ToLocation).km   孩子王公司 ID 2353
     if res[-1] == '2' or res[-1] == '1':  # 判断是否到达, 订单未触发到达且订单未签收
         devid = db.session.query(TMSDevice.Device_IMEICode).filter(TMSDevice.Device_ID == res[2]).first()  # 获取设备码
         dat = {'start_time': str(res[3]).split('.')[0],
-               'end_time': datetime.strptime(str(res[4]).split('.')[0], "%Y-%m-%d %H:%M:%S")+timedelta(days=3),
+               'end_time': datetime.strptime(str(res[4]).split('.')[0], "%Y-%m-%d %H:%M:%S") + timedelta(days=3),
                'imei': devid[0],
                'order_statues': 2
                }
@@ -574,7 +679,8 @@ def get_arrive_status(id):  # 判断设备位置和目的地距离 到达状态
                'order_statues': 4
                }
         if dat['sign_time'] > dat['start_time']:
-            if (datetime.strptime(dat['sign_time'], '%Y-%m-%d %H:%M:%S')-datetime.strptime(dat['start_time'], '%Y-%m-%d %H:%M:%S')).days <=3:
+            if (datetime.strptime(dat['sign_time'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(dat['start_time'],
+                                                                                             '%Y-%m-%d %H:%M:%S')).days <= 3:
                 dat = dat
             else:
                 dat['sign_time'] = datetime.strptime(dat['start_time'], '%Y-%m-%d %H:%M:%S') + timedelta(days=3)
@@ -625,13 +731,18 @@ def process_control(**kwargs):  # 流程控制入口
     res = db.session.query(SmsSendtrack).filter(SmsSendtrack.Index_Id == index_id,
                                                 SmsSendtrack.Index_Status.between(2, 16)).first()
     # 获取对应订单的定位数据，出发地和目的地经纬度，绑定时间
+    print(index_id)
     a = get_no_start_msg_reason(index_id, Index_StartMsgStatus)
-    if len(a) == 5:
+    if len(a) == 9:
         datalist = a[0]
         Index_FromLocation = a[1]
         Index_ToLocation = a[2]
         Index_DeviceBindingTime = a[3]
         Index_CreateTime = a[4]
+        Index_FromTime = a[5]
+        bing_position = a[6]
+        Index_Fromtype = a[7]
+        Index_Totype = a[8]
         # 判断出发地和目的地直线距离单位KM
         from_to_dis = round(geodesic(Index_FromLocation, Index_ToLocation).km, 2)
         # print(from_to_dis, Index_CreateTime, Index_DeviceBindingTime)
@@ -639,10 +750,12 @@ def process_control(**kwargs):  # 流程控制入口
         if res:
             ToContact = res.Index_ToContact
             if res.Index_CreatorCompanyID == 1925:  # TOP订单，截取前面11位
-                ToContact = ToContact[:10]
+                ToContact = ToContact[:11]
             ShipMode = res.Index_ShipMode  # 1表示市内订单，2表示长途订单
             if ShipMode == 1:  # 市内订单
                 if res.Index_StartMsgStatus == 0:  # 没有出发短信的订单
+                    # print(len(str(ToContact)), ToContact)
+                    # print('市内没超过20{}'.format(index_id))
                     if from_to_dis <= 20:  # 市内订单 极短距离
                         a = "{'res': '订单距离小于20公里，无出发短信!', 'code': 10001}"
                         res.Index_NoStartMsgRes = str(a)
@@ -651,21 +764,34 @@ def process_control(**kwargs):  # 流程控制入口
                         a = "{'res': '补绑的市内订单，无出发短信!', 'code': 10001}"
                         res.Index_NoStartMsgRes = str(a)
                         res.Index_NoStartMsgCode = 10001
+                    if int(res.Index_Fromtype) == 0:
+                        a = "{'res': '出发地不是精确坐标，无出发短信!', 'code': 10001}"
+                        res.Index_NoStartMsgRes = str(a)
+                        res.Index_NoStartMsgCode = 10001
                     else:  # 直线距离超过20公里
-                        if re.match(r'1[3,4,5,7,8]\d{9}', ToContact) and len(ToContact) == 11:
-                            print('1出发短信', datetime.now())
-                            a, code = get_start_msg_res(index_id, datalist, Index_FromLocation, Index_ToLocation)
-                            print('1出发短信', datetime.now())
-                            res.Index_NoStartMsgRes = str(a)
-                            res.Index_NoStartMsgCode = code
+                        # print('市内超过20{}'.format(index_id))
+                        # print(len(str(ToContact)), ToContact)
+                        if len(str(ToContact)) == 11:
+                            if res.Index_CreateTime != Index_DeviceBindingTime:
+                                a = "{'res': '补绑的市内订单，无出发短信!', 'code': 10001}"
+                                res.Index_NoStartMsgRes = str(a)
+                                res.Index_NoStartMsgCode = 10001
+                            else:
+                                # print('2出发短信', datetime.now())
+                                a, code = get_start_msg_res(index_id, datalist, Index_FromLocation, Index_ToLocation,
+                                                            Index_DeviceBindingTime, Index_FromTime, bing_position)
+                                print('2出发短信', datetime.now())
+                                res.Index_NoStartMsgRes = str(a)
+                                res.Index_NoStartMsgCode = code
                         else:
-                            res.Index_NoStartMsgRes = "{'res':'号码不是手机号,无法获取出发短信！','code':10001}"
+                            res.Index_NoStartMsgRes = "{'res':'号码不是手机号3,无法获取出发短信！','code':10001}"
                             res.Index_NoStartMsgCode = 10001
                 else:
                     res.Index_NoStartMsgRes = "{'res': '出发短信已发送！', 'code': 10001}"
                     res.Index_NoStartMsgCode = 10001
                 if res.Index_ArriveMsgStatus == 0:  # 没有预到达短信
-                    if re.match(r'1[3,4,5,7,8]\d{9}', ToContact) and len(ToContact) == 11:
+                    print(len(str(ToContact)), ToContact)
+                    if len(str(ToContact)) == 11:
                         print('1预到达短', datetime.now())
                         b, code = get_arrive_msg_res(datalist=datalist, FromLocation=Index_FromLocation,
                                                      ToLocation=Index_ToLocation,
@@ -673,8 +799,12 @@ def process_control(**kwargs):  # 流程控制入口
                         print('1预到达短', datetime.now())
                         res.Index_NoArriveMsgRes = str(b)
                         res.Index_NoArriveMsgCode = code
+                    elif int(res.Index_Fromtype) == 0:
+                        b = "{'res': '目的地不是精确坐标，无预到达短信!', 'code': 10001}"
+                        res.Index_NoArriveMsgRes = str(b)
+                        res.Index_NoArriveMsgCode = 10001
                     else:
-                        res.Index_NoArriveMsgRes = "{'res':'号码不是手机号,无法获取预到达短信！','code':10001}"
+                        res.Index_NoArriveMsgRes = "{'res':'号码不是手机号4,无法获取预到达短信！','code':10001}"
                         res.Index_NoArriveMsgCode = 10001
                 else:
                     res.Index_NoArriveMsgRes = "{'res': '预到达短信已发送！', 'code': 10001}"
@@ -684,26 +814,29 @@ def process_control(**kwargs):  # 流程控制入口
                     c, code = get_arrive_status(index_id)
                     print('1到达', datetime.now())
                     res.Index_NoArriveRes = str(c)
-                    res.Index_NoArriveMsgCode = code
+                    res.Index_NoArriveResCode = code
                 else:
                     res.Index_NoArriveRes = "{'res': '已触发已到达状态！', 'code': 10001}"
-                    res.Index_NoArriveMsgCode = 10001
+                    res.Index_NoArriveResCode = 10001
             if ShipMode == 2:  # 长途订单
                 if res.Index_StartMsgStatus == 0:
-                    if re.match(r'1[3,4,5,7,8]\d{9}', ToContact) and len(ToContact) == 11:
+                    print(len(str(ToContact)), ToContact)
+                    if len(str(ToContact)) == 11:
                         print('2出发短信', datetime.now())
-                        a, code = get_start_msg_res(index_id, datalist, Index_FromLocation, Index_ToLocation)
+                        a, code = get_start_msg_res(index_id, datalist, Index_FromLocation, Index_ToLocation,
+                                                    Index_DeviceBindingTime, Index_FromTime, bing_position)
                         print('2出发短信', datetime.now())
                         res.Index_NoStartMsgRes = str(a)
                         res.Index_NoStartMsgCode = code
                     else:
-                        res.Index_NoStartMsgRes = "{'res':'号码不是手机号,无法获取出发短信！','code':10001}"
+                        res.Index_NoStartMsgRes = "{'res':'号码不是手机号1,无法获取出发短信！','code':10001}"
                         res.Index_NoStartMsgCode = 10001
                 else:
                     res.Index_NoStartMsgRes = "{'res': '出发短信已发送！', 'code': 10001}"
                     res.Index_NoStartMsgCode = 10001
                 if res.Index_ArriveMsgStatus == 0:  # 没有预到达短信
-                    if re.match(r'1[3,4,5,7,8]\d{9}', ToContact) and len(ToContact) == 11:
+                    print(len(str(ToContact)), ToContact)
+                    if len(str(ToContact)) == 11:
                         print('2预到达短', datetime.now())
                         b, code = get_arrive_msg_res(datalist=datalist, FromLocation=Index_FromLocation,
                                                      ToLocation=Index_ToLocation,
@@ -712,7 +845,7 @@ def process_control(**kwargs):  # 流程控制入口
                         res.Index_NoArriveMsgRes = str(b)
                         res.Index_NoArriveMsgCode = code
                     else:
-                        res.Index_NoArriveMsgRes = "{'res':'号码不是手机号,无法获取预到达短信！','code':10001}"
+                        res.Index_NoArriveMsgRes = "{'res':'号码不是手机号2,无法获取预到达短信！','code':10001}"
                         res.Index_NoArriveMsgCode = 10001
                 else:
                     res.Index_NoArriveMsgRes = "{'res': '预到达短信已发送！', 'code': 10001}"
@@ -722,15 +855,14 @@ def process_control(**kwargs):  # 流程控制入口
                     c, code = get_arrive_status(index_id)
                     print('2到达', datetime.now())
                     res.Index_NoArriveRes = str(c)
-                    res.Index_NoArriveCode = code
+                    res.Index_NoArriveResCode = code
                 else:
                     res.Index_NoArriveRes = "{'res': '已触发已到达状态！', 'code': 10001}"
-                    res.Index_NoArriveCode = 10001
+                    res.Index_NoArriveResCode = 10001
         else:
             print('{}订单已经关闭'.format(index_id))
             return False
     else:
-        print(2222)
         b, code = get_no_start_msg_reason(index_id, Index_StartMsgStatus)
         if res:
             res.Index_NoStartMsgRes = b
@@ -738,25 +870,28 @@ def process_control(**kwargs):  # 流程控制入口
             res.Index_NoArriveMsgRes = b
             res.Index_NoArriveMsgCode = code
             res.Index_NoStartMsgCode = code
-            res.Index_NoArriveCode = code
+            res.Index_NoArriveResCode = code
         else:
             print('{}订单已经关闭'.format(index_id))
             return False
     try:
         res.Index_UpdateTime = datetime.now()
-        print(res.Index_NoStartMsgRes)
-        print(res.Index_NoArriveMsgRes)
-        print(res.Index_NoArriveRes)
+        print(res.Index_NoStartMsgRes, index_id)
+        print(res.Index_NoArriveMsgRes, index_id)
+        print(res.Index_NoArriveRes, index_id)
         print(datetime.now())
         db.session.commit()
     except Exception as e:
-        print(e, 1111)
+        print(e, 10086)
 
 
 def get_sign_order_sms():
+    my_time = datetime.now()
     res = db.session.query(SmsSendtrack.Index_Id).filter(SmsSendtrack.Index_DeviceCode is not None,
                                                          SmsSendtrack.Index_SignTime > SmsSendtrack.Index_UpdateTime,
-                                                         SmsSendtrack.Index_Status.between(4, 16)).order_by(
+                                                         SmsSendtrack.Index_Status.between(4, 16),
+                                                         SmsSendtrack.Index_ToTime >= (
+                                                                 my_time - timedelta(days=3))).order_by(
         SmsSendtrack.Index_Id).all()  # 签收时间在更新订单短信之前则再次更新订单数据
     c = 0
     all_order = len(res)
@@ -772,8 +907,11 @@ def get_sign_order_sms():
 
 
 def get_not_sign_order_sms():
+    my_time = datetime.now()
     res = db.session.query(SmsSendtrack.Index_Id).filter(SmsSendtrack.Index_DeviceCode is not None,
-                                                         SmsSendtrack.Index_Status.between(0, 2)).order_by(
+                                                         SmsSendtrack.Index_Status.between(0, 2),
+                                                         SmsSendtrack.Index_ToTime >= (
+                                                                 my_time - timedelta(days=3))).order_by(
         SmsSendtrack.Index_Id).all()
     c = 0
     all_order = len(res)
@@ -826,12 +964,43 @@ def get_abnormal_arrive_order(page, size):  # 获取已签收到达短信异常�
     return {'datelist': arr_list, 'total_page': res.pages, 'total': res.total}
 
 
+def track_alarm():
+    headers = {"Content-Type": "application/json;charset=utf-8"}
+    data2 = {
+        "devId": "351608087000000",
+        "longitude": 112.9073128,
+        "latitude": 28.2136306,
+        "model": 0,
+        "type": 0,
+        "mcc": 0,
+        "mnc": 0,
+        "lac": 0,
+        "cellId": 0,
+        "time": str(datetime.now()),
+        "course": 0,
+        "speed": 0
+    }
+    url2 = "http://trackportal.wlyuan.com.cn/position/add"
+    a = requests.put(url2, data=json.dumps(data2), headers=headers)
+    if a.status_code != 200 or True != json.loads(a.text)['status']:
+        content = {
+            "msgtype": "text",
+            "text": {
+                "content": "trackportal.wlyuan.com.cn，凉透了！"
+            },
+            "at": {
+                "isAtAll": True
+            }
+        }
+        url = "https://oapi.dingtalk.com/robot/send?access_token=e235237cea85ece1684a446deb9ac54b50c0468e130c2005df09365cc263cee8"
+        r = requests.post(url=url, headers=headers, json=content)
+        print(r.content)
+    print(a.text)
+
+
 # 1925
-# get_sms_order()
-# print(get_abnormal_start_order(1, 2), get_abnormal_arrive_order(1, 2))
-# 1172984
 # def test_order_sms():
-#     data = {"index_id": '1183316',
+#     data = {"index_id": '3152281',
 #             'case1': 'Index_StartMsgStatus',
 #             'case2': 'Index_ArriveMsgStatus',
 #             'case3': 'Index_EndStatus',
@@ -842,6 +1011,7 @@ def get_abnormal_arrive_order(page, size):  # 获取已签收到达短信异常�
 # test_order_sms()
 # get_sms_order()
 while 1:
+    track_alarm()
     print('-------------开始同步SMS表订单数据----------------')
     get_sms_order()
     print('-------------------同步完成----------------------')
@@ -856,13 +1026,13 @@ while 1:
     print('--------------------同步完成---------------------')
     print('------------开始同步已签收订单短信状态--------------')
     get_status4_msg()
-    print('--------------------同步完成----------------------')
-    print('-------------开始同步签收订单短信情况---------------')
+    print('--------------------同步完成---------------------')
+    print('-------------开始同步签收订单短信情况--------------')
     get_sign_order_sms()
-    print('--------------------同步完成----------------------')
-    print('-------------开始同步未签收订单短信情况--------------')
+    print('--------------------同步完成---------------------')
+    print('-------------开始同步未签收订单短信情况-------------')
     get_not_sign_order_sms()
-    print('--------------------同步完成----------------------')
+    print('--------------------同步完成---------------------')
     sleep(1800)
 
 # p = ThreadPoolExecutor()  # 线程池 #如果不给定值，默认cup*5
@@ -924,4 +1094,4 @@ while 1:
 #     d = geodesic((i['latitude'], i['longitude']), tt).km
 #     d2 = round(d, 2)
 #     if d2 <= 1:
-#         print(d2, i['time'])
+#         print(d2, i['time'])  1196795

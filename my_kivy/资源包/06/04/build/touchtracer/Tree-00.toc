@@ -1,0 +1,13 @@
+('touchtracer',
+ None,
+ [],
+ 'DATA',
+ [('android.txt', 'touchtracer\\android.txt', 'DATA'),
+  ('icon.png', 'touchtracer\\icon.png', 'DATA'),
+  ('main.py', 'touchtracer\\main.py', 'DATA'),
+  ('particle.png', 'touchtracer\\particle.png', 'DATA'),
+  ('README.txt', 'touchtracer\\README.txt', 'DATA'),
+  ('touchtracer.kv', 'touchtracer\\touchtracer.kv', 'DATA'),
+  ('__pycache__\\main.cpython-37.pyc',
+   'touchtracer\\__pycache__\\main.cpython-37.pyc',
+   'DATA')])

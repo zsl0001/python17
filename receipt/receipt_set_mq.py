@@ -2,6 +2,7 @@
 # coding:utf-8
 import os
 import sys
+import time
 
 sys.path.append("..")
 from datetime import datetime
@@ -47,6 +48,18 @@ class TMSDevice(Base):
     Device_CompanyID = Column('Device_CompanyID', BigInteger)
     Device_Invalid = Column('Device_Invalid', Integer)
     Device_Type = Column('Device_Type', Integer, nullable=False)
+
+
+class TMSRegister(Base):
+    __tablename__ = 'TMS_Register'
+    __table_args__ = {'schema': 'WLY.dbo'}
+    id = Column(BigInteger, nullable=False, index=True, primary_key=True)
+    index_phone = Column(String(128))
+    index_deviceCode = Column(String(128))
+    index_insertTime = Column(DateTime, default=datetime.now)
+    index_Invalid = Column(Integer, default=0)
+    index_creator = Column(String(128))
+    index_updateTime = Column(DateTime, default=datetime.now)
 
 
 class TMSOrderIndex(Base):
@@ -185,27 +198,27 @@ class TMSOrderIndex(Base):
     Index_WithChildType = Column(Integer)
 
 
-db_connect_string = 'mssql+pymssql://WLY:Wly2.techns@907@192.168.1.200:1433/ERE?charset=utf8'
-# db_connect_string = 'mssql+pymssql://WLY:Wly2.techns@907@172.16.16.23:1433/ERE?charset=utf8'
+# db_connect_string = 'mssql+pymssql://WLY:Wly2.techns@907@192.168.1.200:1433/ERE?charset=utf8'
+db_connect_string = 'mssql+pymssql://WLY:Wly2.techns@907@172.16.16.23:1433/ERE?charset=utf8'
 # 以mysql数据库为例：mysql+数据库驱动：//用户名：密码@localhost:3306/数据库
 engine = create_engine(db_connect_string)  # 创建引擎
 Sesssion = sessionmaker(bind=engine)  # 产生会话
 session = Sesssion()  # 创建Session实例
 
-M_conn = MongoClient('192.168.1.168', 27017)
+# M_conn = MongoClient('192.168.1.168', 27017)
 
-# M_conn = MongoClient(
-#     host='mongodb://er_user:vE0UmSo1fV3q@dds-uf6a4f0597f9e3041.mongodb.rds.aliyuncs.com:3717,dds-uf6a4f0597f9e3042.mongodb.rds.aliyuncs.com:3717/er?replicaSet=mgset-13011481')
+M_conn = MongoClient(
+    host='mongodb://er_user:vE0UmSo1fV3q@dds-uf6a4f0597f9e3041.mongodb.rds.aliyuncs.com:3717,dds-uf6a4f0597f9e3042.mongodb.rds.aliyuncs.com:3717/er?replicaSet=mgset-13011481')
 db = M_conn.er
 collection = db.orderResult
 
-conn = pymssql.connect('192.168.1.200', 'WLY', 'Wly2.techns@907', 'WLY', charset='utf8')
+# conn = pymssql.connect('192.168.1.200', 'WLY', 'Wly2.techns@907', 'WLY', charset='utf8')
 
-# conn = pymssql.connect('172.16.16.23', 'WLY', 'Wly2.techns@907', 'WLY', charset='utf8')
+conn = pymssql.connect('172.16.16.23', 'WLY', 'Wly2.techns@907', 'WLY', charset='utf8')
 cur = conn.cursor(as_dict=True)
 
-import stomp
-import time
+# import stomp
+# import time__topic_name1
 
 # 推送到主题
 __topic_name1 = '/queue/SETTING_CMD_SETT'
@@ -220,13 +233,13 @@ __user = 'admin'
 __password = 'nanruan@9.07'
 
 
-def set_imei():
-    mq_conn = stomp.Connection10([(__host, __port)], auto_content_length=False)
-    # conn.start()
-    mq_conn.connect(__user, __password, wait=True)
-    mq_conn.send(__topic_name1, '351608086050742#100863313#300#4')
-    time.sleep(1)
-    mq_conn.disconnect()
+# def set_imei():
+#     mq_conn = stomp.Connection10([(__host, __port)], auto_content_length=False)
+#     # conn.start()
+#     mq_conn.connect(__user, __password, wait=True)
+#     mq_conn.send(__topic_name1, '351608086050742#100863313#300#4')
+#     time.sleep(1)
+#     mq_conn.disconnect()
 
 
 def get_set_data():  # 获取符合条件的订单
@@ -237,39 +250,47 @@ def get_set_data():  # 获取符合条件的订单
         cur.execute("exec sp_pub_sendmessage")
         result = cur.fetchall()
         for i in result:
-            # if i['IMEICode'][8] == '6':
-            if i['IMEICode'] in imei_list:
+            res_regs = session.query(TMSRegister.index_deviceCode).filter(TMSRegister.index_deviceCode == i['IMEICode'],
+                                                                          TMSRegister.index_deviceCode == 0).first()  # index_deviceCode index_Invalid
+            if res_regs is None:
                 l.append({'FromCity': i['FromCity'], 'ToCity': i['ToCity'], 'IMEI': str(i['IMEICode']), 'id': i['Id'],
                           'PactCode': i['PactCode']})
         for k in l:
             m.append(k['IMEI'])
         set_m = list(set(m))
+        print(set_m)
         data1 = {'IMEI': '', 'id': '', 'Count': ''}
         data2 = {'IMEI': '', 'id': '', 'Count': ''}
-        for d in set_m:
+        for d in set_m:  # 2960 大田
+            datian = session.query(TMSDevice).filter(TMSDevice.Device_IMEICode == d, TMSDevice.Device_Invalid == 0,
+                                                     TMSDevice.Device_Type == 3,TMSDevice.Device_CompanyID != 2960).first()
             s_m = []
-            for imei in result:
-                if imei['IMEICode'] == d:
-                    if imei['FromCity'] == imei['ToCity']:
-                        data1['IMEI'] = d
-                        data1['id'] = imei['Id']
-                        data1['Count'] = 300
-                        Count = 300
-                    elif imei['Customer'] == '孩子王儿童用品股份有限公司':
-                        data1['IMEI'] = d
-                        data1['id'] = imei['Id']
-                        data1['Count'] = 300
-                        Count = 300
-                    else:
-                        data2['IMEI'] = d
-                        data2['id'] = imei['Id']
-                        data2['Count'] = 3600
-                        Count = 3600
-                    s_m.append(Count)
-            if min(s_m) == 300:
-                res.append(data1)
-            else:
-                res.append(data2)
+            if datian:
+                print(d)
+                for imei in result:
+                    if imei['IMEICode'] == d:
+                        # print('------------',d)
+                        if imei['FromCity'] == imei['ToCity']:
+                            data1['IMEI'] = d
+                            data1['id'] = imei['Id']
+                            data1['Count'] = 300
+                            Count = 300
+                        elif imei['Customer'] == '孩子王儿童用品股份有限公司':
+                            data1['IMEI'] = d
+                            data1['id'] = imei['Id']
+                            data1['Count'] = 300
+                            Count = 300
+                        else:
+                            data2['IMEI'] = d
+                            data2['id'] = imei['Id']
+                            data2['Count'] = 3600
+                            Count = 3600
+                        s_m.append(Count)
+                if min(s_m) == 300:
+                    res.append(data1.copy())
+                else:
+                    res.append(data2.copy())
+                print(res)
     except Exception as e:
         print(e)
     print(res)
@@ -322,44 +343,44 @@ def get_no_order_imei():
     for i in res:
         company_id = session.query(TMSDevice).filter(TMSDevice.Device_Invalid == 0,
                                                      TMSDevice.Device_IMEICode == i.IMEI).first()
-        order = session.query(TMSOrderIndex).filter(TMSOrderIndex.Index_DeviceCode == i.IMEI,
-                                                    TMSOrderIndex.Index_SrcClass == 1,
-                                                    TMSOrderIndex.Index_Status.between(1, 2),
-                                                    or_(
-                                                        TMSOrderIndex.Index_SupplierCompanyID == company_id.Device_CompanyID,
-                                                        TMSOrderIndex.Index_CreatorCompanyID == company_id.Device_CompanyID)).count()
-        if order == 0:
-            new_ord = session.query(ReceiptSetInfo).filter(ReceiptSetInfo.IMEI == i.IMEI).order_by(
-                ReceiptSetInfo.Set_Time.desc()).first()
-            if len(str(new_ord.Tag)) == 9 and str(new_ord.Tag)[-2:] == '18':
-                l.append({'res': '该设备已经存在', 'imei': i.IMEI, 'tag': new_ord.Tag})
-            else:
-                m.append(i.IMEI)
-                new_order = ReceiptSetInfo()
-                new_order.Type = new_ord.Type
-                new_order.IMEI = new_ord.IMEI
-                new_order.Tag = int(str(new_ord.Tag) + '18')
-                new_order.Content = 18000
-                try:
-                    session.add(new_order)
-                    session.commit()
-                    session.close()
-                except Exception as e:
-                    print(e)
-    data = {'false': m,
-            'true': l}
-    print(data)
+        if company_id:
+            order = session.query(TMSOrderIndex).filter(TMSOrderIndex.Index_DeviceCode == i.IMEI,
+                                                        TMSOrderIndex.Index_SrcClass == 1,
+                                                        TMSOrderIndex.Index_Status.between(1, 2),
+                                                        or_(
+                                                            TMSOrderIndex.Index_SupplierCompanyID == company_id.Device_CompanyID,
+                                                            TMSOrderIndex.Index_CreatorCompanyID == company_id.Device_CompanyID)).count()
+            if order == 0:
+                new_ord = session.query(ReceiptSetInfo).filter(ReceiptSetInfo.IMEI == i.IMEI).order_by(
+                    ReceiptSetInfo.Set_Time.desc()).first()
+                if len(str(new_ord.Tag)) == 9 and str(new_ord.Tag)[-2:] == '18':
+                    l.append({'res': '该设备已经存在', 'imei': i.IMEI, 'tag': new_ord.Tag})
+                else:
+                    m.append(i.IMEI)
+                    new_order = ReceiptSetInfo()
+                    new_order.Type = new_ord.Type
+                    new_order.IMEI = new_ord.IMEI
+                    new_order.Tag = int(str(new_ord.Tag) + '18')
+                    new_order.Content = 18000
+                    try:
+                        session.add(new_order)
+                        session.commit()
+                        session.close()
+                    except Exception as e:
+                        print(e)
+        data = {'false': m,
+                'true': l}
+        print(data)
     return data
 
 
-get_no_order_imei()
-
+#
 # a = get_set_data()
 # up_data_receipt(a)
-# if __name__ == "__main__":
-#     while 1:
-#         print('----------正在获取符合条件的订单------------', datetime.now())
-#         a = get_set_data()
-#         print('----------正在同步符合条件的订单------------', datetime.now())
-#         up_data_receipt(a)
-#         time.sleep(300)
+if __name__ == "__main__":
+    while 1:
+        print('----------正在获取符合条件的订单------------', datetime.now())
+        a = get_set_data()
+        print('----------正在同步符合条件的订单------------', datetime.now())
+        up_data_receipt(a)
+        time.sleep(300)

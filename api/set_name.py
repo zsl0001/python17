@@ -192,12 +192,12 @@ class Set_Name:
 
     def aotu_send_cmd(self):
         __topic_name1 = '/queue/SETTING_CMD_SETT'
-        # __host = '122.51.209.32'
-        __host = '10.81.101.117'
+        __host = '122.51.209.32'
+        # __host = '10.81.101.117'
         __port = 61613
         __user = 'admin'
-        # __password = 'admin'
-        __password = 'nanruan@9.07'
+        __password = 'admin'
+        # __password = 'nanruan@9.07'
         mq_conn = stomp.Connection10([(__host, __port)], auto_content_length=False)
         mq_conn.connect(__user, __password, wait=True)
         res = models.ReceiptSetLog.query.with_entities(models.ReceiptSetLog.IMEI).distinct().all()

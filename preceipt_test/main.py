@@ -1,6 +1,7 @@
 import json
 import sys
 import threading
+from datetime import datetime
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -12,7 +13,7 @@ from PyQt5.QtGui import QStandardItem, QStandardItemModel
 
 sys.path.append("..")
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QDialog, QTableView, QTableWidgetItem
-from PyQt5.QtCore import QThread,pyqtSignal,QObject
+from PyQt5.QtCore import QThread, pyqtSignal, QObject
 import requests
 import stomp
 import time
@@ -238,12 +239,12 @@ class Ui_Dialog(object):
 __topic_name1 = '/queue/SETTING_CMD_SETT'
 __topic_name2 = '/queue/SETTING_CMD_ORD'
 # __host = '122.51.209.32'
-__host = '10.81.101.117'
+# __host = '10.81.101.117'
+__host = '139.196.160.63'
 __port = 61613
 __user = 'admin'
 
 # __password = 'admin'
-
 
 __password = 'nanruan@9.07'
 
@@ -324,9 +325,19 @@ class MyWindow(QMainWindow, Ui_MainWindow):
         self.parentclicked.connect(self.recv2)
         self.w2 = ChildWin()
         self.flag = 1
+        self.num = 0
+
+    def setup_time(self):
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.operate)  # 每次计时到时间时发出信号
+        self.timer.start(1000)  # 设置计时间隔并启动；单位毫秒
+        print(datetime.now())
 
     def show_text_func(self):
         self.textBrowser.setPlainText(self.textEdit_2.toPlainText())
+
+    def operate(self):
+        self.num = self.num + 1
 
     def set_work_mode(self):
         a = self.textEdit_2.toPlainText()  # 获取编辑框内容
@@ -345,18 +356,22 @@ class MyWindow(QMainWindow, Ui_MainWindow):
                      'tag': int(tag)
                      }
             self.flag = 1
-            while self.flag:
-                self.textBrowser.append('命令发送中，请等待确认结果！------')
+            count = 0
+            set_imei(name=self.topic_name1, data=data)
+            while self.flag and count <= 30:
+                count = count + 1
+                self.textBrowser.append(f'命令已发送，请等待确认结果！------{count}')
+                time.sleep(1)
                 res = requests.post(url=url1, data=json.dumps(data2))
+                print(json.loads(res.text), count)
                 QApplication.processEvents()
-                time.sleep(2)
                 if json.loads(res.text):
                     print(self.flag)
                     self.textBrowser.append('命令设置成功！')
                     self.flag = 0
                     break
-                else:
-                    set_imei(name=self.topic_name1, data=data)
+            if count == 30:
+                self.textBrowser.append('命令设置失败，请重试！')
         else:
             QMessageBox.warning(self,
                                 "警告",
@@ -385,18 +400,21 @@ class MyWindow(QMainWindow, Ui_MainWindow):
                          'tag': int(tag)
                          }
                 self.flag = 1
-                while self.flag:
-                    print(data)
-                    set_imei(name=self.topic_name1, data=data)
-                    self.textBrowser.append('命令发送中，请等待确认结果！------')
+                count = 0
+                set_imei(name=self.topic_name1, data=data)
+                while self.flag and count <= 30:
+                    count = count + 1
+                    self.textBrowser.append(f'命令已发送，请等待确认结果！------{count}')
+                    time.sleep(1)
                     res = requests.post(url=url1, data=json.dumps(data2))
                     QApplication.processEvents()
-                    time.sleep(2)
                     if json.loads(res.text):
                         cc = '命令设置成功,当前GPS定位频率为{}秒/次！'.format(b)
                         self.textBrowser.append(cc)
                         self.flag = 0
                         break
+                if count == 30:
+                    self.textBrowser.append('命令发送失败，请重试！')
             else:
                 QMessageBox.warning(self,
                                     "警告",
@@ -414,7 +432,7 @@ class MyWindow(QMainWindow, Ui_MainWindow):
             print(a)
             res = requests.post(url=url1, data=json.dumps(data2))
             res = json.loads(res.text)
-            if res =='暂无数据！':
+            if res == '暂无数据！':
                 res_str = '暂无数据！'
             else:
                 addr = trans_add(lat=res['Latitude'], lng=res['Longitude'])
@@ -524,17 +542,20 @@ class MyWindow(QMainWindow, Ui_MainWindow):
                      'tag': int(tag)
                      }
             self.flag = 1
-            while self.flag:
-                self.textBrowser.append('命令发送中，请等待确认结果！------')
+            count = 0
+            set_imei(name=self.topic_name1, data=data)
+            while self.flag and count <= 30:
+                count = count + 1
+                self.textBrowser.append(f'命令已发送，请等待确认结果！------{count}')
+                time.sleep(1)
                 res = requests.post(url=url1, data=json.dumps(data2))
                 QApplication.processEvents()
-                time.sleep(2)
                 if json.loads(res.text):
                     self.textBrowser.append('命令设置成功！')
                     self.flag = 0
                     break
-                else:
-                    set_imei(name=self.topic_name1, data=data)
+            if count == 30:
+                self.textBrowser.append('命令发送失败，请重试！')
         else:
             QMessageBox.warning(self,
                                 "警告",
@@ -548,24 +569,28 @@ class MyWindow(QMainWindow, Ui_MainWindow):
             tag2 = random.randint(1, 999)
             tag = '7' + str(tag1) + str(tag2)
             data = str(a) + '#' + tag + '#' + '2'
-            print(tag)
+            print(tag, '更新')
             url1 = 'http://106.14.17.157:7777/api/get_order_res/'
             data2 = {'code': 'qwer?1234!@#1312',
                      'imei': a,
                      'tag': int(tag)
                      }
             self.flag = 1
-            while self.flag:
-                self.textBrowser.append('命令发送中，请等待确认结果！------')
+            count = 0
+            set_imei(name=self.topic_name2, data=data)
+            while self.flag and count <= 30:
+                count = count + 1
+                self.textBrowser.append(f'命令已发送，请等待确认结果！------{count}')
+                time.sleep(1)
                 res = requests.post(url=url1, data=json.dumps(data2))
                 QApplication.processEvents()
-                time.sleep(2)
                 if json.loads(res.text):
                     self.textBrowser.append('命令设置成功！')
                     self.flag = 0
                     break
-                else:
-                    set_imei(name=self.topic_name2, data=data)
+            if count == 30:
+                self.textBrowser.append('命令设置失败，请重试！')
+
         else:
             QMessageBox.warning(self,
                                 "警告",
@@ -579,18 +604,16 @@ class MyWindow(QMainWindow, Ui_MainWindow):
             tag2 = random.randint(1, 999)
             tag = '7' + str(tag1) + str(tag2)
             data = str(a) + '#' + tag + '#' + '3'
-            print(tag)
-            url1 = 'http://106.14.17.157:7777/api/get_order_res/'
-            data2 = {'code': 'qwer?1234!@#1312',
-                     'imei': a,
-                     'tag': int(tag)
-                     }
+            print(tag, '关机')
+            # url1 = 'http://106.14.17.157:7777/api/get_order_res/'
+            # data2 = {'code': 'qwer?1234!@#1312',
+            #          'imei': a,
+            #          'tag': int(tag)
+            #          }
             self.flag = 1
-            while self.flag:
-                self.textBrowser.append('命令发送中，请等待确认结果！------')
-                res = requests.post(url=url1, data=json.dumps(data2))
-                QApplication.processEvents()
-                set_imei(name=self.topic_name2, data=data)
+            self.textBrowser.append('命令已发送，请在设备上确定!')
+            QApplication.processEvents()
+            set_imei(name=self.topic_name2, data=data)
         else:
             QMessageBox.warning(self,
                                 "警告",
@@ -604,24 +627,26 @@ class MyWindow(QMainWindow, Ui_MainWindow):
             tag2 = random.randint(1, 999)
             tag = '7' + str(tag1) + str(tag2)
             data = str(a) + '#' + tag + '#' + '1'
-            print(tag)
+            print(tag, '获取最新定位')
             url1 = 'http://106.14.17.157:7777/api/get_order_res/'
             data2 = {'code': 'qwer?1234!@#1312',
                      'imei': a,
                      'tag': int(tag)
                      }
             self.flag = 1
-            while self.flag:
-                self.textBrowser.append('命令发送中，请等待确认结果！------')
+            count = 0
+            set_imei(name=self.topic_name2, data=data)
+            while self.flag and count < 30:
+                self.textBrowser.append(f'命令已发送，请等待确认结果！------{count}')
+                time.sleep(1)
                 res = requests.post(url=url1, data=json.dumps(data2))
                 QApplication.processEvents()
-                time.sleep(2)
                 if json.loads(res.text):
                     self.textBrowser.append('命令设置成功！')
                     self.flag = 0
                     break
-                else:
-                    set_imei(name=self.topic_name2, data=data)
+            if count == 30:
+                self.textBrowser.append('命令设置失败，请重试！')
         else:
             QMessageBox.warning(self,
                                 "警告",
@@ -642,32 +667,34 @@ class MyWindow(QMainWindow, Ui_MainWindow):
                      'tag': int(tag)
                      }
             self.flag = 1
-            while self.flag:
-                self.textBrowser.append('命令发送中，请等待确认结果！------')
+            count = 0
+            set_imei(name=self.topic_name3, data=data)
+            while self.flag and count < 30:
+                self.textBrowser.append(f'命令已发送，请等待确认结果！------{count}')
                 QApplication.processEvents()
+                count = count + 1
+                time.sleep(1)
                 res = requests.post(url=url2, data=json.dumps(data3))
-                time.sleep(2)
-                if json.loads(res.text):
-                    res = json.loads(res.text)
-                    if res !='暂无数据！':
-                        res_str = '暂无数据！'
-                    else:
-                        res_str = f"<span>IMEI:{res['devId']}<br>" \
-                                  f"GSM信号:{res['gsmLevel']}<br>" \
-                                  f"电量:{res['lithium']}<br>" \
-                                  f"时间:{res['date']}<br>" \
-                                  f"定位频率:{res['posInvl']}<br>" \
-                                  f"休眠频率:{res['time2Sleep']}<br>" \
-                                  f"心跳频率:{res['hbInvl']}<br>" \
-                                  f"工作模式:{res['workMode']}<br>" \
-                                  "<\span>"
+                res = json.loads(res.text)
+                if res == '暂无数据！':
+                    res_str = '暂无数据！'
+                else:
+                    res_str = f"<span>IMEI:{res['devId']}<br>" \
+                              f"GSM信号:{res['gsmLevel']}<br>" \
+                              f"电量:{res['lithium']}<br>" \
+                              f"时间:{res['date']}<br>" \
+                              f"定位频率:{res['posInvl']}<br>" \
+                              f"休眠频率:{res['time2Sleep']}<br>" \
+                              f"心跳频率:{res['hbInvl']}<br>" \
+                              f"工作模式:{res['workMode']}<br>" \
+                              "<\span>"
+                    self.flag = 0
                     QApplication.processEvents()
                     self.textBrowser.append(res_str)
-                    # self.textBrowser.append('命令设置成功！')
-                    self.flag = 0
                     break
-                else:
-                    set_imei(name=self.topic_name3, data=data)
+                QApplication.processEvents()
+                self.textBrowser.append(res_str)
+                # self.textBrowser.append('命令设置成功！')
         else:
             QMessageBox.warning(self,
                                 "警告",
@@ -692,3 +719,5 @@ if __name__ == '__main__':
     myWin.pushButton_5.clicked.connect(myWin.child)
     myWin.show()
     sys.exit(app.exec_())
+
+'''5602FF00011003516080870791129460042737500744C0DE0D0A'''

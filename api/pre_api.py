@@ -38,7 +38,7 @@ from flask_docs import ApiDoc
 # from api_preceipt.api.login_mode.pic.cutimg import getAuthImage,AuthImage,get_redis_res
 from resources_files import *
 
-
+# change_sales_company
 
 executor = ThreadPoolExecutor(5)
 my = open_mysql()
@@ -131,7 +131,7 @@ def signin():
         user.parent_id = parent_id
         user.sales_name = sales_name  # 利用user model中的类属性方法加密用户的密码并存入数据库
         Sales_Set_Log.Creator_Name = User.query.filter(User.role_id == 1).first().username
-        Sales_Set_Log.Insert_Time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        Sales_Set_Log.Insert_Time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         Sales_Set_Log.IP = ip
         Sales_Set_Log.User_Name = salesaccount
         Sales_Set_Log.Content = '{}在{}，新增了用户{}，所在地IP地址为:{}。'.format(Sales_Set_Log.Creator_Name,
@@ -690,7 +690,7 @@ def search_pactcode_by_imei():
         page = data['page']
         size = data['size']
         id = int(data['id'])
-        d = models.search_pactcode_by_imei(data, page, size, id)
+        d = search_pactcode_by_imei2(data, page, size, id)
         c = jsonify(d)
         return c
 
@@ -859,7 +859,7 @@ def set_account_properties():
             Sales_Set_Log.User_Name = salesaccount
             res = models.set_account_properties(data)
             Sales_Set_Log.Creator_Name = useraccount
-            Sales_Set_Log.Insert_Time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            Sales_Set_Log.Insert_Time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             Sales_Set_Log.IP = ip
             if type == 1:
                 Sales_Set_Log.Content = '{}在{},修改了用户{}的密码,操作地IP为{}。'.format(Sales_Set_Log.Creator_Name,
@@ -968,12 +968,11 @@ def change_sales_company():
     Sales_Set_Log = models.SalesSetLog()
     if request.method == 'POST':
         data = request.get_json(force=True)  # Company_Id, user_id=None, disable=0,
-        print(data)
         if data['disable'] == 0: # 变更归属
             a,b = models.change_sales_company(Company_Id=data['Company_Id'], user_name=data['user_name'],disable=data['disable'])
             Sales_Set_Log.User_Name = data['user_name']
             Sales_Set_Log.Creator_Name = data['useraccount']
-            Sales_Set_Log.Insert_Time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            Sales_Set_Log.Insert_Time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             Sales_Set_Log.IP = ip
             Sales_Set_Log.Last_Sales = b
             Company_Name = TMSSale.query.filter(TMSSale.Company_Id == data['Company_Id']).first().Company_Name
@@ -986,7 +985,7 @@ def change_sales_company():
             user_id = TMSSale.query.filter(TMSSale.Company_Id == data['Company_Id']).first().user_id
             Sales_Set_Log.User_Name = data['user_name']
             Sales_Set_Log.Creator_Name = data['useraccount']
-            Sales_Set_Log.Insert_Time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            Sales_Set_Log.Insert_Time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             Sales_Set_Log.IP = ip
             Company_Name = TMSSale.query.filter(TMSSale.Company_Id == data['Company_Id']).first().Company_Name
             Sales_Set_Log.Company_ID = data['Company_Id']
@@ -1313,9 +1312,13 @@ def renew_flow_fee():
         else:
             ip = request.remote_addr
         data = request.get_json(force=True)
-        s = device_stock(data=data,ip=ip)
-        a = s.renew_flow_fee()
-        c = jsonify(a)
+        s = device_stock(data=data, ip=ip)
+        if 'end_time' in data[0].keys():
+            a = s.renew_flow_fee()
+            c = jsonify(a)
+        else:
+            a = s.change_sales()
+            c = jsonify(a)
         s.close_conn()
         return c
 
@@ -1668,6 +1671,83 @@ def get_test_mp():
             a = s.get_test_position()
             c = jsonify(a)
             return c
+
+# @api.route('/get_top_order/', methods=['POST'])
+# def get_top_order():
+#     if request.method == 'POST':
+#         data = request.get_json(force=True)
+#         if data['code'] =='qwer?1234!@#1312':
+#             a = get_top_order_info(data=data)
+#             c = jsonify(a)
+#             return c
+
+@api.route('/disabled_devices/', methods=['POST'])
+@auth.login_required
+def disabled_devices():
+    if request.method == 'POST':
+        if 'X-Real-Ip' in request.headers.keys():
+            ip = request.headers['X-Real-Ip']
+        else:
+            ip = request.remote_addr
+        data = request.get_json(force=True)
+        s = Set_Device_Comapy(data=data,ip=ip)
+        a = s.disabled_devices()
+        c = jsonify(a)
+        s.close_conn()
+        return c
+
+@api.route('/add_register_devices/', methods=['POST'])
+@auth.login_required
+def add_register_devices2():
+    if request.method == 'POST':
+        if 'X-Real-Ip' in request.headers.keys():
+            ip = request.headers['X-Real-Ip']
+        else:
+            ip = request.remote_addr
+        data = request.get_json(force=True)
+        s = add_register_devices(data=data)
+        c = jsonify(s)
+        return c
+
+@api.route('/get_register_devices_list/', methods=['POST'])
+@auth.login_required
+def get_register_devices_list2():
+    if request.method == 'POST':
+        if 'X-Real-Ip' in request.headers.keys():
+            ip = request.headers['X-Real-Ip']
+        else:
+            ip = request.remote_addr
+        data = request.get_json(force=True)
+        s = get_register_devices_list(data=data)
+        c = jsonify(s)
+        return c
+@api.route('/set_register_devices_status/', methods=['POST'])
+@auth.login_required
+def set_register_devices_status2():
+    if request.method == 'POST':
+        if 'X-Real-Ip' in request.headers.keys():
+            ip = request.headers['X-Real-Ip']
+        else:
+            ip = request.remote_addr
+        data = request.get_json(force=True)
+        s = set_register_devices_status(data=data)
+        c = jsonify(s)
+        return c
+
+
+@api.route('/add_pos/', methods=['POST'])
+def set_add_pos():
+    if request.method == 'POST':
+        if 'X-Real-Ip' in request.headers.keys():
+            ip = request.headers['X-Real-Ip']
+        else:
+            ip = request.remote_addr
+        data = request.get_json(force=True)
+        s = add_pos(data=data)
+        c = jsonify(s)
+        return c
+
+
 app.register_blueprint(api, url_prefix='/api')
 # @api.route('/excel_download/', methods=['POST'])
 # @auth.login_required
@@ -1678,6 +1758,8 @@ app.register_blueprint(api, url_prefix='/api')
 #         s = Set_Device_Comapy(data=data,ip=ip)
 #         download_path = s.excel_test()
 #         return send_from_directory(app.config['UPLOAD_FOLDER'],filename,as_attachment=True)
+
+
 if __name__ == '__main__':
     scheduler = APScheduler()
     scheduler.init_app(app)

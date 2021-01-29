@@ -100,16 +100,16 @@ def find_lastHBT(imei):
 # 删除不想要的字段
 # data_new = data.T.drop(['_id','url','title'])
 # print(data_new)
-my_list = [{"imei": "351608087063108", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087072141", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087072489", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087081977", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087079047", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087079088", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087084690", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087078858", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087078924", "useraccount": "admin", "username": "超级管理员"},
-           {"imei": "351608087078841", "useraccount": "admin", "username": "超级管理员"}]
+# my_list = [{"imei": "351608087063108", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087072141", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087072489", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087081977", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087079047", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087079088", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087084690", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087078858", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087078924", "useraccount": "admin", "username": "超级管理员"},
+#            {"imei": "351608087078841", "useraccount": "admin", "username": "超级管理员"}]
 
 
 def my_info(my_list):

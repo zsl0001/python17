@@ -1,0 +1,9 @@
+('gstvideo',
+ None,
+ [],
+ 'DATA',
+ [('videoplayer.py', 'gstvideo\\videoplayer.py', 'DATA'),
+  ('__init__.py', 'gstvideo\\__init__.py', 'DATA'),
+  ('__pycache__\\videoplayer.cpython-37.pyc',
+   'gstvideo\\__pycache__\\videoplayer.cpython-37.pyc',
+   'DATA')])

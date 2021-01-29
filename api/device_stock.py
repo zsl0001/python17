@@ -6,7 +6,7 @@ sys.path.append("..")
 
 from sqlalchemy import extract, or_
 
-from models import db, DeviceStock, TMSCompany, TMSSale, StockLog, User
+from models import db, DeviceStock, TMSCompany, TMSSale, StockLog, User, TMSDevice,TemperatureReceipt
 
 
 def set_log(IMEI, Creator_Name, Sales_Name, Content, Set_time):
@@ -36,11 +36,18 @@ class device_stock:
         ss_list = []
         fail_list = []
         for i in self.data:
+            Device_type = i['type']
             useraccount = i['useraccount']
             username = i['username']
             res = DeviceStock()
             log = StockLog()
             res.Device_IMEI = i['imei']
+            res.Device_type = Device_type
+            is_temp = db.session.query(TemperatureReceipt).filter(TemperatureReceipt.imei== i['imei']).first()
+            if is_temp:
+                res.Device_Temperature =1
+            else:
+                res.Device_Temperature =0
             count = db.session.query(DeviceStock).filter(DeviceStock.Device_IMEI == i['imei']).first()
             # print(i['imei'], count.Device_IMEI)
             print(count is None)
@@ -348,7 +355,7 @@ class device_stock:
 
     def renew_flow_fee(self):  # 流量续费
         l = []
-        dat = {'res': '修改失败!', 'datalist': '','code':-1001}
+        dat = {'res': '修改失败!', 'datalist': '', 'code': -1001}
         for i in self.data:
             try:
                 imei = i['imei']
@@ -378,7 +385,7 @@ class device_stock:
                 l.append({'imei': imei, 'res': '设备不存在，请先维护库存!', 'code': -1001})
         dat['datalist'] = l
         if len(l) == 0:
-            return {'res': '修改成功！','code': 1001}
+            return {'res': '修改成功！', 'code': 1001}
         else:
             return dat
 
@@ -432,21 +439,44 @@ class device_stock:
         if 'sales_name' in self.data.keys():
             sales_name = self.data['sales_name']
             res = res.filter(DeviceStock.Sales_Name.like('%' + sales_name + '%'))
+        if 'type' in self.data.keys():
+            type = self.data['type']
+            res = res.filter(DeviceStock.Device_type == type)
+        if 'temperature' in self.data.keys():
+            temperature = self.data['temperature']
+            res = res.filter(DeviceStock.Device_Temperature == temperature)
         return res
+
+    def change_sales(self):
+        for i in self.data:
+            set_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sales_name = i['sales_name']
+            imei = i['imei']
+            username = i['username']
+            useraccount = i['useraccount']
+            res = db.session.query(User.sales_name).filter(User.username == sales_name, User.username != 'admin',
+                                                           User.is_disable == 0).first()
+            stock = db.session.query(DeviceStock).filter(DeviceStock.is_disable == 0,
+                                                         DeviceStock.Device_IMEI == imei).first()
+            if res and stock:
+                old_saler = stock.Sales_Name
+                new_saler = res[0]
+                stock.Sales_Name = new_saler
+                content = f'{username}将编码为{imei}设备的从销售{old_saler}改为{new_saler}，修改时间为{set_time}，修改地IP为{self.ip}.'
+                set_log(IMEI=imei, Creator_Name=useraccount, Sales_Name=username, Set_time=set_time,
+                        Content=[content])
+            try:
+                db.session.commit()
+                #
+            except Exception as e:
+                print(e)
+                return {'res': '修改失败!', 'code': -1001}
+        return {'res': '修改成功!', 'code': 1001}
 
     def close_conn(self):
         db.session.close()
-# data = [{"imei": 351608086043218, "user_name": "admin", "id": "84"},
-#         {"imei": 351608086043283, "user_name": "admin", "id": "84"},
-#         {"imei": 351608086043259, "user_name": "admin", "id": "84"},
-#         {"imei": 351608086042285, "user_name": "admin", "id": "84"},
-#         {"imei": 351608086041162, "user_name": "admin", "id": "84"},
-#         {"imei": 351608086043085, "user_name": "admin", "id": "84"},
-#         {"imei": 351608086037301, "user_name": "admin", "id": "84"}]
-#
 
-# print(b)
-# data = {"page": 1, "size": 20, "id": "84", "imei": "351608086050478"}
+# data = {"page":1,"size":25,"id":"84","username":"超级管理员","useraccount":"admin","type":"2"}
 # s = device_stock(data, ip='192.168.1.1')
 # b = s.get_all_stock()
 # print(b)

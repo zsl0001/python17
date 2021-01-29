@@ -6,7 +6,7 @@ import pandas as pd
 import pymssql
 
 sys.path.append("..")
-from models import db, TMSDevice, TMSCompany, TMSSale, StockLog, User, TMSOrderIndex, ReceiptLog
+from models import db, TMSDevice, TMSCompany, TMSSale, StockLog, User, TMSOrderIndex, ReceiptLog,TemperatureReceipt
 from datetime import datetime, timedelta
 from myconfig import mgdb, sqldb, api_cfg
 from math import *
@@ -261,10 +261,15 @@ class Set_Device_Comapy:
                     device.Device_SIMid = i['simid']
                     device.Device_IMEICode = i['imeicode']
                     device.Device_CompanyID = cp_name.Company_ID
-                    device.Device_temperature = i['temperature']
+                    res = db.session.query(TemperatureReceipt).filter(TemperatureReceipt.imei == i['imeicode']).count()
+                    if res:
+                        temperature = 1
+                    else:
+                        temperature = 0
+                    device.Device_temperature = temperature
                     device.Device_InsertTime = set_time
-                    # device.Device_Expiry_Starttime = ''
-                    # device.Device_Expiry_Endtime = ''
+                    device.Device_Expiry_Starttime = ''
+                    device.Device_Expiry_Endtime = ''
                     device.Device_IMSI = ''
                     device.Device_Creator = i['id']
                     device.Device_OwnerType = 0
@@ -273,10 +278,10 @@ class Set_Device_Comapy:
                         device.Device_SIMBatch = i['simbatch']
                     if 'phoneNo' in i.keys() and len(str(i['phoneNo'])) >= 1:
                         device.Device_PhoneNo = i['phoneNo']
-                    if 'startTime' in i.keys() and 'endTime' in i.keys():
-                        if len(str(i['startTime'])) > 1 and len(str(i['endTime'])) >= 1:
-                            device.Device_Expiry_Starttime = i['startTime']
-                            device.Device_Expiry_Endtime = i['endTime']
+                    if 'expiryStarttime' in i.keys() and 'expiryEndtime' in i.keys():
+                        if len(str(i['expiryStarttime'])) > 1 and len(str(i['expiryEndtime'])) >= 1:
+                            device.Device_Expiry_Starttime = i['expiryStarttime']
+                            device.Device_Expiry_Endtime = i['expiryEndtime']
                             device.Device_OwnerType = 1
                     if 'salerName' in i.keys() and len(str(i['salerName'])) >= 1:
                         device.Device_SalerName = i['salerName']
@@ -922,6 +927,41 @@ class Set_Device_Comapy:
             print(e)
             return {'res': '导出失败!', 'code': -1001}
 
+    def disabled_devices(self):
+        error_list = []
+        for i in self.data:
+            useraccount = i['useraccount']
+            username = i['username']
+            res = db.session.query(TMSDevice).filter(TMSDevice.Device_IMEICode == i['imeicode'],
+                                                     TMSDevice.Device_Invalid == 0).first()
+            invalid = i['invalid']
+            if int(invalid) not in [0, 1]:
+                error_list.append({'imei': i['imeicode'], 'res': '参数错误，修改失败！', 'code': -100001})
+            if res is None:
+                error_list.append({'imei': i['imeicode'], 'res': '设备不存在或者已被禁用，请核实后再试！', 'code': -100001})
+            else:
+                res.Device_Invalid = invalid
+                # user_name = db.session.query(User).filter(User.id == i['id'], User.is_disable == 0).first()
+                # user_name = user_name.sales_name
+                set_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                if int(invalid) == 1:
+                    content = f"{username}将设备编码为{i['imeicode']}的设备禁用了,修改时间为{set_time},修改地ip为{self.ip}."
+                if int(invalid) == 0:
+                    content = f"{username}将设备编码为{i['imeicode']}的设备启用了,修改时间为{set_time},修改地ip为{self.ip}."
+                Receipt_Log(IMEI=i['imeicode'], User_Name=username, User_ID=i['id'], Set_Time=set_time,
+                            IP=self.ip,
+                            Content=content)
+                try:
+                    db.session.add(res)
+                    db.session.commit()
+                except Exception as e:
+                    print(e)
+                    return {'res': '修改失败!', 'code': -1001}
+        if error_list:
+            res_data = {'code': -1001, 'datalist': error_list}
+            return res_data
+        else:
+            return {'code': 1001, 'res': '修改成功！'}
 
 #
 # data = {'page': 1, 'size': 25, 'invalid': 0, 'file_name': '10066.xls','useraccount':'admin'}

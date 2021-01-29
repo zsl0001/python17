@@ -9,10 +9,10 @@ import requests
 from datetime import datetime
 from myconfig import sqldb, mgdb, api_cfg, ere_cfg
 
-# base_url1 = "http://192.168.1.89:1001"
+base_url1 = "http://192.168.1.89:1001"
 
 
-base_url1 = "http://172.16.14.133:1001"
+# base_url1 = "http://172.16.14.133:1001"
 
 
 def get_lastSupName(id):

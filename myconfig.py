@@ -32,6 +32,13 @@ my_redis = {'host': rc.cp.get("redis", "host"),
             'db': rc.cp.get("redis", "db"),
             'port': rc.cp.get("redis", "port")}
 
+my_sql = {'host': rc.cp.get("mysql", "host"),
+          'username': rc.cp.get("mysql", "username"),
+          'password': rc.cp.get("mysql", "password"),
+          'db': rc.cp.get("mysql", "db"),
+          'port': rc.cp.get("mysql", "port")}
+
+
 # print(sqldb)
 # print(mgdb)
 # print(api_cfg
@@ -39,4 +46,5 @@ my_redis = {'host': rc.cp.get("redis", "host"),
 
 
 def conf():
-    return sqldb, mgdb, api_cfg, ere_cfg, my_redis
+    return sqldb, mgdb, api_cfg, ere_cfg, my_redis, my_sql
+

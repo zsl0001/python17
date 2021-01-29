@@ -39,7 +39,7 @@ class More_Position:
         if 'type' in self.data:
             p_type = self.data['type']
             res = Position.objects.filter(
-                (Q(time__gte=self.st) & Q(time__lte=self.ed) & Q(type=int(p_type)) & Q(devId=str(self.data['imei']))))
+                (Q(time__gte=self.st) & Q(time__lte=self.ed) & Q(type=int(p_type)) & Q(devId=str(self.data['imei'])))).order_by('time')
             for i in res:
                 p_data = {
                     'devId': i.devId,
@@ -54,7 +54,7 @@ class More_Position:
                 my_list.append(p_data)
         else:
             res = Position.objects.filter(
-                (Q(time__gte=self.st) & Q(time__lte=self.ed) & Q(devId=str(self.data['imei']))))
+                (Q(time__gte=self.st) & Q(time__lte=self.ed) & Q(devId=str(self.data['imei'])))).order_by('time')
             for i in res:
                 p_data = {
                     'devId': i.devId,

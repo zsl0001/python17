@@ -21,6 +21,9 @@ from api.bind_company import Set_Device_Comapy
 from api.top_order import get_top_order_info
 from api.get_all_device import get_all_device
 from api.get_device_info import my_info
+from api.search_pactcode import search_pactcode_by_imei2
+from api.tms_register import *
+from api.third_temp import *
 # a = db.session.query(User).filter(User.username =='admin').first()
 # print(a.username)
 # a = open_mysql()

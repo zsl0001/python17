@@ -95,6 +95,7 @@ def get_location_time(t):
 
 def check():
     for k in imei_list:
+        time.sleep(1)
         print('正在处理IMEI码为{}的设备！'.format(k))
         res = session.query(ReceiptTemp).filter(ReceiptTemp.imei == k).first()
         t = datetime.datetime.now()
@@ -108,12 +109,9 @@ def check():
             p_time = datetime.datetime.strptime(lt, '%Y-%m-%d %H:%M:%S')
             res.last_hbt_time = p_time
             a = (now - p_time).seconds
-
             print('最后心跳时间{},当前时间为{},相差{}秒!'.format(p_time, now, a))
             # if a <= 300:
             set_imei(k)
-
-        d.close()
         try:
             session.commit()
             session.close()

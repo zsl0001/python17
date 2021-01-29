@@ -63,9 +63,7 @@ __user = 'admin'
 __password = 'nanruan@9.07'
 
 
-def send_order():
-    mq_conn = stomp.Connection10([(__host, __port)], auto_content_length=False)
-    mq_conn.connect(__user, __password, wait=True)
+def send_order(mq_conn):
     res = session.query(ReceiptSetInfo.IMEI, func.max(ReceiptSetInfo.Set_Time)).filter(
         ReceiptSetInfo.Result == 0).group_by(ReceiptSetInfo.IMEI).all()
     for k in res:
@@ -79,7 +77,6 @@ def send_order():
                                              ReceiptSetInfo.Set_Time != k[1], ReceiptSetInfo.Result == 0).delete()
         session.commit()
     session.close()
-    mq_conn.disconnect()
 
 
 def check_res():
@@ -94,9 +91,11 @@ def check_res():
 
 
 if __name__ == "__main__":
-    while 1:
-        print('----------正在确定发送指定------------', datetime.now())
-        check_res()
-        print('----------正在发送设置指定------------', datetime.now())
-        send_order()
-        time.sleep(300)
+    mq_conn = stomp.Connection10([(__host, __port)], auto_content_length=False)
+    mq_conn.connect(__user, __password, wait=True)
+    print('----------正在确定发送指定------------', datetime.now())
+    check_res()
+    print('----------正在发送设置指定------------', datetime.now())
+    send_order(mq_conn=mq_conn)
+    mq_conn.disconnect()
+    print('发送完成')
